@@ -133,6 +133,7 @@ function(setup_quality_targets SOURCE_FILES COMPILABLE_SOURCE_FILES)
             --suppress=ctuOneDefinitionRuleViolation
             --suppress=normalCheckLevelMaxBranches
             --suppress=unmatchedSuppression
+            --suppress=useStlAlgorithm
             --inline-suppr
             --quiet
         )

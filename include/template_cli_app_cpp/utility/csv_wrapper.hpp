@@ -66,7 +66,6 @@ public:
         }
         const auto &indices = *indices_result;
         std::vector<double> result;
-        // cppcheck-suppress useStlAlgorithm - predicate フィルタを含むため std::transform に単純置換不可
         for (auto &row : csv_reader) {
             if (predicate(row)) {
                 for (int idx : indices) {
@@ -102,11 +101,9 @@ public:
         }
         const auto &indices = *indices_result;
         std::vector<std::string> result;
-        // cppcheck-suppress useStlAlgorithm - predicate フィルタを含むため std::transform に単純置換不可
         for (auto &row : csv_reader) {
             if (predicate(row)) {
                 for (int idx : indices) {
-                    // string_view はイテレータ進行後に無効化されるため string にコピー
                     result.emplace_back(row[idx].get<csv::string_view>());
                 }
             }
@@ -138,7 +135,6 @@ public:
         }
         const auto &indices = *indices_result;
         out.clear();
-        // cppcheck-suppress useStlAlgorithm - predicate フィルタを含むため std::transform に単純置換不可
         for (auto &row : csv_reader) {
             if (predicate(row)) {
                 for (int idx : indices) {
@@ -173,11 +169,9 @@ public:
         }
         const auto &indices = *indices_result;
         out.clear();
-        // cppcheck-suppress useStlAlgorithm - predicate フィルタを含むため std::transform に単純置換不可
         for (auto &row : csv_reader) {
             if (predicate(row)) {
                 for (int idx : indices) {
-                    // string_view はイテレータ進行後に無効化されるため string にコピー
                     out.emplace_back(row[idx].get<csv::string_view>());
                 }
             }
