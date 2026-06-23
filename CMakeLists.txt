@@ -202,8 +202,23 @@ endif()
 # Development utilities
 # ==============================================================================
 
-# Enable testing for CTest
-enable_testing()
+# valgrind (memcheck) の設定
+# include(CTest) は enable_testing() を含み、DartConfiguration.tcl を生成する。
+# ctest -T memcheck で登録済みテストを自動的に valgrind 実行できる。
+find_program(MEMORYCHECK_COMMAND NAMES valgrind)
+if(MEMORYCHECK_COMMAND)
+    set(MEMORYCHECK_COMMAND_OPTIONS
+        "--error-exitcode=1 --leak-check=full --show-leak-kinds=all --track-origins=yes"
+        CACHE STRING "valgrind options for ctest memcheck")
+    message(STATUS "valgrind      : ${MEMORYCHECK_COMMAND}")
+endif()
+include(CTest)
+
+configure_file(
+    ${CMAKE_SOURCE_DIR}/cmake/CTestCustom.cmake.in
+    ${CMAKE_BINARY_DIR}/CTestCustom.cmake
+    @ONLY
+)
 
 add_subdirectory(tests)
 add_subdirectory(benches)

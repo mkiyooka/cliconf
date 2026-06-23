@@ -117,8 +117,5 @@ cmake --build build-coverage --target coverage-report
 
 # ---- valgrind workflow ----
 # Requires system valgrind: sudo apt-get install valgrind  (Ubuntu/Debian)
-valgrind = """
-valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 ./build/tests/test_config_manager &&
-valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 ./build/tests/test_doctest_usage &&
-valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=1 ./build/tests/test_yyjson_wrapper
-"""
+# ctest -T memcheck で登録済みテストを自動的に valgrind 実行する
+valgrind = "ctest --test-dir build -T memcheck"

@@ -1,0 +1,4 @@
+# CTest カスタム設定（configure_file で build/ に生成される）
+
+# サードパーティライブラリのテストは memcheck 対象外にする
+set(CTEST_CUSTOM_MEMCHECK_IGNORE "tl::expected::tests")
