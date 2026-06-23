@@ -21,38 +21,56 @@ namespace config {
 namespace {
 
 // ──────────────────────────────────────────────
-// TOML ユーティリティ
+// ドット区切りキー解決（共通テンプレート）
 // ──────────────────────────────────────────────
+//
+// Accessor は以下の static メンバを持つ:
+//   const Node* GetChild(const Node& node, const std::string& key)
+//   std::optional<T> GetLeaf<T>(const Node& node, const std::string& key)
 
-template <typename T>
-std::optional<T> ResolveTomlKey(const toml::table &tbl, std::string_view dotted_key) {
-    const toml::table *current = &tbl;
+template <typename Accessor, typename T, typename Node>
+std::optional<T> ResolveDottedKey(const Node &root, std::string_view dotted_key) {
+    const Node *current = &root;
     std::string_view remaining = dotted_key;
 
     while (true) {
         const auto dot_pos = remaining.find('.');
         if (dot_pos == std::string_view::npos) {
-            return (*current)[remaining].template value<T>();
+            return Accessor::template GetLeaf<T>(*current, std::string(remaining));
         }
-        const auto head = remaining.substr(0, dot_pos);
+        const auto head = std::string(remaining.substr(0, dot_pos));
         remaining = remaining.substr(dot_pos + 1);
-        current = (*current)[head].as_table();
+        current = Accessor::GetChild(*current, head);
         if (current == nullptr) {
             return std::nullopt;
         }
     }
 }
 
+// ──────────────────────────────────────────────
+// TOML アクセサ
+// ──────────────────────────────────────────────
+
+struct TomlAccessor {
+    static const toml::table *GetChild(const toml::table &node, const std::string &key) {
+        return node[key].as_table();
+    }
+
+    template <typename T>
+    static std::optional<T> GetLeaf(const toml::table &node, const std::string &key) {
+        return node[key].template value<T>();
+    }
+};
+
 void LoadFromToml(const std::string &file_path, Config &conf) {
     const auto tbl = toml::parse_file(file_path);
 
-    // スキーマフィールドを自動マッピング
     std::apply(
         [&](auto &&...field) {
             (
                 [&] {
                     using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveTomlKey<FieldType>(tbl, field.config_key);
+                    auto val = ResolveDottedKey<TomlAccessor, FieldType>(tbl, field.config_key);
                     if (val.has_value()) {
                         conf.*field.member = *val;
                     }
@@ -63,7 +81,6 @@ void LoadFromToml(const std::string &file_path, Config &conf) {
         kConfigSchema
     );
 
-    // plugins 配列 (スキーマ対象外の複合型)
     if (const auto *arr = tbl["plugin"].as_array()) {
         conf.plugins.clear();
         for (const auto &el : *arr) {
@@ -76,7 +93,6 @@ void LoadFromToml(const std::string &file_path, Config &conf) {
         }
     }
 
-    // subcommands セクション
     if (const auto *subs = tbl["subcommands"].as_table()) {
         for (std::size_t i = 0; i < kSubcommandMappingCount; ++i) {
             const auto &mapping = kSubcommandMappings[i];
@@ -89,31 +105,25 @@ void LoadFromToml(const std::string &file_path, Config &conf) {
 }
 
 // ──────────────────────────────────────────────
-// JSON/JSONC ユーティリティ
+// JSON/JSONC アクセサ
 // ──────────────────────────────────────────────
 
-template <typename T>
-std::optional<T> ResolveJsonKey(const nlohmann::json &j, std::string_view dotted_key) {
-    const nlohmann::json *current = &j;
-    std::string_view remaining = dotted_key;
-
-    while (true) {
-        const auto dot_pos = remaining.find('.');
-        if (dot_pos == std::string_view::npos) {
-            const auto key = std::string(remaining);
-            if (!current->is_object() || !current->contains(key)) {
-                return std::nullopt;
-            }
-            return current->at(key).get<T>();
+struct JsonAccessor {
+    static const nlohmann::json *GetChild(const nlohmann::json &node, const std::string &key) {
+        if (!node.is_object() || !node.contains(key) || !node.at(key).is_object()) {
+            return nullptr;
         }
-        const auto head = std::string(remaining.substr(0, dot_pos));
-        remaining = remaining.substr(dot_pos + 1);
-        if (!current->is_object() || !current->contains(head) || !current->at(head).is_object()) {
+        return &node.at(key);
+    }
+
+    template <typename T>
+    static std::optional<T> GetLeaf(const nlohmann::json &node, const std::string &key) {
+        if (!node.is_object() || !node.contains(key)) {
             return std::nullopt;
         }
-        current = &current->at(head);
+        return node.at(key).get<T>();
     }
-}
+};
 
 void LoadFromJson(const std::string &file_path, Config &conf) {
     std::ifstream ifs(file_path);
@@ -126,13 +136,12 @@ void LoadFromJson(const std::string &file_path, Config &conf) {
         /*ignore_comments=*/true
     );
 
-    // スキーマフィールドを自動マッピング
     std::apply(
         [&](auto &&...field) {
             (
                 [&] {
                     using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveJsonKey<FieldType>(j, field.config_key);
+                    auto val = ResolveDottedKey<JsonAccessor, FieldType>(j, field.config_key);
                     if (val.has_value()) {
                         conf.*field.member = *val;
                     }
@@ -143,7 +152,6 @@ void LoadFromJson(const std::string &file_path, Config &conf) {
         kConfigSchema
     );
 
-    // plugins 配列
     if (j.contains("plugin") && j.at("plugin").is_array()) {
         conf.plugins.clear();
         for (const auto &el : j.at("plugin")) {
@@ -160,31 +168,25 @@ void LoadFromJson(const std::string &file_path, Config &conf) {
 }
 
 // ──────────────────────────────────────────────
-// YAML ユーティリティ
+// YAML アクセサ
 // ──────────────────────────────────────────────
 
-template <typename T>
-std::optional<T> ResolveYamlKey(const fkyaml::node &node, std::string_view dotted_key) {
-    const fkyaml::node *current = &node;
-    std::string_view remaining = dotted_key;
-
-    while (true) {
-        const auto dot_pos = remaining.find('.');
-        if (dot_pos == std::string_view::npos) {
-            const auto key = std::string(remaining);
-            if (!current->is_mapping() || !current->contains(key)) {
-                return std::nullopt;
-            }
-            return current->at(key).get_value<T>();
+struct YamlAccessor {
+    static const fkyaml::node *GetChild(const fkyaml::node &node, const std::string &key) {
+        if (!node.is_mapping() || !node.contains(key) || !node.at(key).is_mapping()) {
+            return nullptr;
         }
-        const auto head = std::string(remaining.substr(0, dot_pos));
-        remaining = remaining.substr(dot_pos + 1);
-        if (!current->is_mapping() || !current->contains(head) || !current->at(head).is_mapping()) {
+        return &node.at(key);
+    }
+
+    template <typename T>
+    static std::optional<T> GetLeaf(const fkyaml::node &node, const std::string &key) {
+        if (!node.is_mapping() || !node.contains(key)) {
             return std::nullopt;
         }
-        current = &current->at(head);
+        return node.at(key).get_value<T>();
     }
-}
+};
 
 void LoadFromYaml(const std::string &file_path, Config &conf) {
     std::ifstream ifs(file_path);
@@ -193,13 +195,12 @@ void LoadFromYaml(const std::string &file_path, Config &conf) {
     }
     const auto root = fkyaml::node::deserialize(ifs);
 
-    // スキーマフィールドを自動マッピング
     std::apply(
         [&](auto &&...field) {
             (
                 [&] {
                     using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveYamlKey<FieldType>(root, field.config_key);
+                    auto val = ResolveDottedKey<YamlAccessor, FieldType>(root, field.config_key);
                     if (val.has_value()) {
                         conf.*field.member = *val;
                     }
@@ -210,7 +211,6 @@ void LoadFromYaml(const std::string &file_path, Config &conf) {
         kConfigSchema
     );
 
-    // plugins 配列
     const auto key = std::string("plugin");
     if (root.is_mapping() && root.contains(key) && root.at(key).is_sequence()) {
         conf.plugins.clear();
