@@ -3,6 +3,7 @@ set(CONFIG_SOURCES
     config_loader.cpp
     config_file_loader.cpp
     config_manager.cpp
+    config_validator.cpp
 )
 
 # Create config library

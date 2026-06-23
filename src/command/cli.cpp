@@ -7,6 +7,7 @@
 #include "command/subcommand.hpp"
 #include "config/config_manager.hpp"
 #include "config/config_schema.hpp"
+#include "config/config_validator.hpp"
 
 namespace {
 
@@ -60,13 +61,19 @@ int RunCli(int argc, char *argv[]) {
         std::exit(app.exit(e));
     }
 
-    ExecuteGotSubcommands(app, config);
-
     const Config resolved = config_manager.Resolve(config_file);
     config.title = resolved.title;
     config.value = resolved.value;
 
     MergeNonSchemaFields(config, app, config_manager.GetFileValues());
+
+    const std::string error = config::Validate(config);
+    if (!error.empty()) {
+        fmt::print(stderr, "Error: {}\n", error);
+        return 1;
+    }
+
+    ExecuteGotSubcommands(app, config);
 
     ShowConfig(config);
 
