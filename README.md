@@ -153,47 +153,55 @@ CLI 引数・設定ファイル・デフォルト値を統合管理する。
 
 ## アーキテクチャ概要
 
-```text
-┌─────────────────────────────────────────────────────┐
-│ main.cpp                                            │
-│   └─ RunCli()                                       │
-│        ├─ BuildApp()       … オプション・サブコマンド登録  │
-│        ├─ app.parse()      … CLI11 パース              │
-│        ├─ ConfigManager    … 優先度解決                 │
-│        │    ├─ Resolve()        CLI > File > Default  │
-│        │    └─ GetFileValues()  スキーマ外フィールド      │
-│        ├─ MergeNonSchemaFields … plugins/subcommands  │
-│        ├─ Validate()       … バリデーション              │
-│        └─ Execute*()       … サブコマンド実行            │
-└─────────────────────────────────────────────────────┘
-         │                        │
-         ▼                        ▼
-┌─────────────────┐    ┌─────────────────────┐
-│ コマンド層       │    │ 設定システム          │
-│ command/         │    │ config/              │
-│  cli.cpp         │    │  ConfigManager       │
-│  subcommand.cpp  │    │  ConfigFileLoader    │
-│                  │    │  ConfigValidator     │
-│                  │    │  ConfigSchema        │
-└─────────────────┘    └─────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-         ┌────────┐    ┌──────────┐    ┌──────────┐
-         │  TOML  │    │ JSON(C)  │    │   YAML   │
-         │ toml++ │    │nlohmann/ │    │  fkYAML  │
-         │        │    │  json    │    │          │
-         └────────┘    └──────────┘    └──────────┘
+```mermaid
+flowchart TD
+    subgraph Entry["main.cpp → RunCli()"]
+        direction TB
+        B["BuildApp()
+        オプション・サブコマンド登録"]
+        P["app.parse()
+        CLI11 パース"]
+        R["ConfigManager::Resolve()
+        CLI > File > Default"]
+        M["MergeNonSchemaFields()
+        plugins / subcommands"]
+        V["Validate()
+        バリデーション"]
+        E["Execute*()
+        サブコマンド実行"]
+        B --> P --> R --> M --> V --> E
+    end
 
-┌─────────────────────────────────────────────────────┐
-│ 出力システム（汎用ライブラリ層・変更不要）               │
-│  Logger         … spdlog ベースのログ出力              │
-│  DataRecorder   … CSV / JSON Lines ファイル出力        │
-│  OutputContext  … Logger + Recorder の DI コンテナ     │
-│  JsonBuilder    … yyjson ベースの JSON 組み立て        │
-│                                                     │
-│  → 使用例: examples/example_output.cpp              │
-└─────────────────────────────────────────────────────┘
+    subgraph Command["コマンド層 — command/"]
+        C1["cli.cpp"]
+        C2["subcommand.cpp"]
+    end
+
+    subgraph Config["設定システム — config/"]
+        CM["ConfigManager"]
+        CFL["ConfigFileLoader"]
+        CV["ConfigValidator"]
+        CS["ConfigSchema"]
+    end
+
+    Entry --> Command
+    Entry --> Config
+
+    Config --> TOML["TOML
+    toml++"]
+    Config --> JSON["JSON·JSONC
+    nlohmann/json"]
+    Config --> YAML["YAML
+    fkYAML"]
+
+    subgraph Output["出力システム（汎用ライブラリ層・変更不要）"]
+        L["Logger — spdlog"]
+        DR["DataRecorder — CSV / JSON Lines"]
+        OC["OutputContext — DI コンテナ"]
+        JB["JsonBuilder — yyjson"]
+    end
+
+    Output -.- |"使用例: examples/example_output.cpp"| Entry
 ```
 
 ## ディレクトリ構成
