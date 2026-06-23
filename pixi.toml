@@ -118,4 +118,5 @@ cmake --build build-coverage --target coverage-report
 # ---- valgrind workflow ----
 # Requires system valgrind: sudo apt-get install valgrind  (Ubuntu/Debian)
 # ctest -T memcheck で登録済みテストを自動的に valgrind 実行する
-valgrind = "ctest --test-dir build -T memcheck"
+# system テスト（CLI バイナリの e2e）は memcheck 対象外
+valgrind = "ctest --test-dir build -T memcheck -LE system"

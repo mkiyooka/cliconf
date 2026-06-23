@@ -64,3 +64,110 @@ add_test(
     NAME test_yyjson_wrapper
     COMMAND $<TARGET_FILE:test_yyjson_wrapper>
 )
+
+# ==============================================================================
+# System Tests (CLI バイナリの end-to-end テスト)
+# ==============================================================================
+
+set(SYSTEM_TESTS "")
+
+# add サブコマンド（引数のみ）
+add_test(
+    NAME system_add_args
+    COMMAND $<TARGET_FILE:cmd> add 10 20
+)
+set_tests_properties(system_add_args PROPERTIES
+    PASS_REGULAR_EXPRESSION "10 \\+ 20 = 30"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_add_args)
+
+# subtract サブコマンド（引数のみ）
+add_test(
+    NAME system_subtract_args
+    COMMAND $<TARGET_FILE:cmd> subtract 15 5
+)
+set_tests_properties(system_subtract_args PROPERTIES
+    PASS_REGULAR_EXPRESSION "15 - 5 = 10"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_subtract_args)
+
+# multiply サブコマンド（引数のみ）
+add_test(
+    NAME system_multiply_args
+    COMMAND $<TARGET_FILE:cmd> multiply 3 7
+)
+set_tests_properties(system_multiply_args PROPERTIES
+    PASS_REGULAR_EXPRESSION "3 \\* 7 = 21"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_multiply_args)
+
+# divide サブコマンド（正常系）
+add_test(
+    NAME system_divide_args
+    COMMAND $<TARGET_FILE:cmd> divide 100 4
+)
+set_tests_properties(system_divide_args PROPERTIES
+    PASS_REGULAR_EXPRESSION "100 / 4 = 25"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_divide_args)
+
+# divide ゼロ除算（バリデーションエラー）
+add_test(
+    NAME system_divide_by_zero
+    COMMAND $<TARGET_FILE:cmd> divide 10 0
+)
+set_tests_properties(system_divide_by_zero PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_divide_by_zero)
+
+# TOML 設定ファイル指定
+add_test(
+    NAME system_config_toml
+    COMMAND $<TARGET_FILE:cmd> --config ${CMAKE_SOURCE_DIR}/config/example.toml add 10 20
+)
+set_tests_properties(system_config_toml PROPERTIES
+    PASS_REGULAR_EXPRESSION "title: Example TOML Configuration"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_config_toml)
+
+# JSON 設定ファイル指定
+add_test(
+    NAME system_config_json
+    COMMAND $<TARGET_FILE:cmd> --config ${CMAKE_SOURCE_DIR}/config/example.json add 10 20
+)
+set_tests_properties(system_config_json PROPERTIES
+    PASS_REGULAR_EXPRESSION "title: Example JSONC Configuration"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_config_json)
+
+# YAML 設定ファイル指定
+add_test(
+    NAME system_config_yaml
+    COMMAND $<TARGET_FILE:cmd> --config ${CMAKE_SOURCE_DIR}/config/example.yaml add 10 20
+)
+set_tests_properties(system_config_yaml PROPERTIES
+    PASS_REGULAR_EXPRESSION "title: Example YAML Configuration"
+    FAIL_REGULAR_EXPRESSION "Error|Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_config_yaml)
+
+# ヘルプ表示
+add_test(
+    NAME system_help
+    COMMAND $<TARGET_FILE:cmd> --help
+)
+set_tests_properties(system_help PROPERTIES
+    PASS_REGULAR_EXPRESSION "subcommand"
+)
+list(APPEND SYSTEM_TESTS system_help)
+
+# システムテストにラベルを付与（memcheck 除外用）
+set_tests_properties(${SYSTEM_TESTS} PROPERTIES LABELS "system")
