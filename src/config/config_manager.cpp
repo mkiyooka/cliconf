@@ -38,15 +38,21 @@ void ConfigManager::RegisterOptions(CLI::App &app) {
     );
 }
 
-Config ConfigManager::Resolve(const std::string &explicit_config_path) {
+Config ConfigManager::Resolve(const std::vector<std::string> &config_paths) {
     // デフォルト値で初期化
     Config result{};
 
     // 設定ファイルを読み込む
     file_values_ = Config{};
-    const std::string config_path = explicit_config_path.empty() ? FindDefaultConfig() : explicit_config_path;
-    if (!config_path.empty()) {
-        LoadFromFile(config_path, file_values_);
+    std::vector<std::string> paths = config_paths;
+    if (paths.empty()) {
+        const std::string default_path = FindDefaultConfig();
+        if (!default_path.empty()) {
+            paths.push_back(default_path);
+        }
+    }
+    if (!paths.empty()) {
+        LoadFromFiles(paths, file_values_);
     }
 
     // スキーマフィールドをファイル値で上書き (デフォルト < ファイル)

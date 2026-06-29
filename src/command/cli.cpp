@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <vector>
 
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
@@ -25,8 +26,8 @@ void ShowConfig(const Config &conf) {
     }
 }
 
-void BuildApp(CLI::App &app, std::string &config_file, config::ConfigManager &config_manager, Config &config) {
-    app.add_option("-c,--config", config_file, "Configuration file");
+void BuildApp(CLI::App &app, std::vector<std::string> &config_files, config::ConfigManager &config_manager, Config &config) {
+    app.add_option("-c,--config", config_files, "Configuration file(s)");
     config_manager.RegisterOptions(app);
     SetCallbackSubcommands(app, config);
     SetGotSubcommands(app, config);
@@ -49,11 +50,11 @@ int RunCli(int argc, char *argv[]) {
     CLI::App app{"Command line parser demonstration with different subcommand styles"};
     argv = app.ensure_utf8(argv);
 
-    std::string config_file;
+    std::vector<std::string> config_files;
     config::ConfigManager config_manager;
     Config config;
 
-    BuildApp(app, config_file, config_manager, config);
+    BuildApp(app, config_files, config_manager, config);
 
     try {
         app.parse(argc, argv);
@@ -61,7 +62,7 @@ int RunCli(int argc, char *argv[]) {
         std::exit(app.exit(e));
     }
 
-    const Config resolved = config_manager.Resolve(config_file);
+    const Config resolved = config_manager.Resolve(config_files);
     config.title = resolved.title;
     config.value = resolved.value;
 

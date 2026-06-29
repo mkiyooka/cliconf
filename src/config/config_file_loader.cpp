@@ -246,6 +246,47 @@ void LoadFromFile(const std::string &file_path, Config &conf) {
     }
 }
 
+std::vector<std::string> ExpandManifest(const std::string &manifest_path) {
+    std::ifstream ifs(manifest_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open manifest file: " + manifest_path);
+    }
+
+    const auto parent_dir = std::filesystem::path(manifest_path).parent_path();
+    std::vector<std::string> result;
+    std::string line;
+
+    while (std::getline(ifs, line)) {
+        if (line.empty() || line.find_first_not_of(" \t") == std::string::npos) {
+            continue;
+        }
+        if (line[line.find_first_not_of(" \t")] == '#') {
+            continue;
+        }
+
+        auto path = std::filesystem::path(line);
+        if (path.is_relative()) {
+            path = parent_dir / path;
+        }
+        result.push_back(path.lexically_normal().string());
+    }
+
+    return result;
+}
+
+void LoadFromFiles(const std::vector<std::string> &file_paths, Config &conf) {
+    for (const auto &path : file_paths) {
+        const auto ext = std::filesystem::path(path).extension().string();
+        if (ext == ".conf") {
+            for (const auto &expanded : ExpandManifest(path)) {
+                LoadFromFile(expanded, conf);
+            }
+        } else {
+            LoadFromFile(path, conf);
+        }
+    }
+}
+
 std::string FindDefaultConfig() {
     const std::vector<std::string> candidates = {
         "config/default.toml",

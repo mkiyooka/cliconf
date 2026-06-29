@@ -184,7 +184,7 @@ value = 55
 )");
 
     config::ConfigManager manager;
-    const Config conf = manager.Resolve(temp_file.Str());
+    const Config conf = manager.Resolve({temp_file.Str()});
 
     CHECK(conf.title == "FromFile");
     CHECK(conf.value == 55);
@@ -206,7 +206,7 @@ value = 100
     // vector形式でパース (プログラム名を除いた引数のみ)
     app.parse(std::vector<std::string>{"--settings.value=999"});
 
-    const Config conf = manager.Resolve(config_path);
+    const Config conf = manager.Resolve({config_path});
 
     CHECK(conf.title == "FileTitle"); // ファイルから
     CHECK(conf.value == 999);         // CLIが優先
@@ -214,7 +214,7 @@ value = 100
 
 TEST_CASE("ConfigManager::Resolve: empty path uses defaults") {
     config::ConfigManager manager;
-    const Config conf = manager.Resolve("");
+    const Config conf = manager.Resolve({});
 
     // デフォルト値
     CHECK(conf.title == "title");

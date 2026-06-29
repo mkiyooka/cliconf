@@ -169,5 +169,32 @@ set_tests_properties(system_help PROPERTIES
 )
 list(APPEND SYSTEM_TESTS system_help)
 
+# 複数 --config 指定（後勝ちマージ）
+add_test(
+    NAME system_multi_config
+    COMMAND $<TARGET_FILE:cmd>
+        --config ${CMAKE_SOURCE_DIR}/tests/fixtures/base.toml
+        --config ${CMAKE_SOURCE_DIR}/tests/fixtures/override.toml
+        add 1 2
+)
+set_tests_properties(system_multi_config PROPERTIES
+    PASS_REGULAR_EXPRESSION "title: Override"
+    FAIL_REGULAR_EXPRESSION "Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_multi_config)
+
+# マニフェストファイル (.conf)
+add_test(
+    NAME system_manifest
+    COMMAND $<TARGET_FILE:cmd>
+        --config ${CMAKE_SOURCE_DIR}/tests/fixtures/multi.conf
+        add 1 2
+)
+set_tests_properties(system_manifest PROPERTIES
+    PASS_REGULAR_EXPRESSION "title: Override"
+    FAIL_REGULAR_EXPRESSION "Segmentation"
+)
+list(APPEND SYSTEM_TESTS system_manifest)
+
 # システムテストにラベルを付与（memcheck 除外用）
 set_tests_properties(${SYSTEM_TESTS} PROPERTIES LABELS "system")

@@ -18,11 +18,11 @@ namespace config {
  * 使い方:
  * @code
  * ConfigManager mgr;
- * std::string config_path;
- * app.add_option("-c,--config", config_path, "Configuration file");
+ * std::vector<std::string> config_paths;
+ * app.add_option("-c,--config", config_paths, "Configuration file(s)");
  * mgr.RegisterOptions(app);   // スキーマ由来の全オプションを登録
  * app.parse(argc, argv);      // CLI11がパース
- * Config conf = mgr.Resolve(config_path);  // 優先度解決
+ * Config conf = mgr.Resolve(config_paths);  // 優先度解決
  * @endcode
  */
 class ConfigManager {
@@ -41,12 +41,14 @@ public:
      * スキーマ (config_schema.hpp) に定義されたフィールドのみを解決する。
      * plugins や SubcommandConfig などスキーマ外フィールドは GetFileValues() で取得すること。
      *
-     * @param explicit_config_path -c/--config で指定されたパス (空文字列の場合はデフォルト探索)
+     * 優先度: CLI引数 > 後方ファイル > 前方ファイル > デフォルト値
+     *
+     * @param config_paths 設定ファイルパスのリスト (.conf マニフェストを含む)。空の場合はデフォルト探索
      * @return スキーマフィールドが解決済みの Config
      * @throws std::runtime_error 複数のデフォルト設定ファイルが存在する場合
      * @throws std::runtime_error 設定ファイルのパースに失敗した場合
      */
-    Config Resolve(const std::string &explicit_config_path);
+    Config Resolve(const std::vector<std::string> &config_paths);
 
     /**
      * @brief 設定ファイルから読み込んだ生の値を返す
