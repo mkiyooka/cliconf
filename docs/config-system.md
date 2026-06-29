@@ -15,15 +15,18 @@
 
 | 拡張子           | 形式  | ライブラリ            | 備考              |
 | ---------------- | ----- | --------------------- | ----------------- |
-| `.toml`          | TOML  | tomlplusplus v3.4.0   |                   |
-| `.json`          | JSONC | nlohmann/json v3.12.0 | `//` コメント対応 |
-| `.yaml` / `.yml` | YAML  | fkYAML v0.4.2         |                   |
+| `.toml`          | TOML       | tomlplusplus v3.4.0   |                                    |
+| `.json`          | JSONC      | nlohmann/json v3.12.0 | `//` コメント対応                  |
+| `.yaml` / `.yml` | YAML       | fkYAML v0.4.2         |                                    |
+| `.conf`          | マニフェスト | —                     | 1行1パス、`#` コメント対応        |
 
 ### 優先度
 
 ```text
-CLI引数 > 設定ファイル > Config構造体のデフォルト値
+CLI引数 > 後方の設定ファイル > 前方の設定ファイル > Config構造体のデフォルト値
 ```
+
+`--config` は複数回指定可能。`.conf` 拡張子のファイルはマニフェスト（ファイルリスト）として展開される。
 
 ---
 
@@ -61,10 +64,11 @@ sequenceDiagram
     main->>mgr: RegisterOptions(app)
     Note over mgr,app: スキーマを展開してCLI11にオプションを一括登録
     main->>app: parse(argc, argv)
-    main->>mgr: Resolve(config_path)
+    main->>mgr: Resolve(config_paths)
     mgr->>conf: デフォルト値で初期化
-    mgr->>loader: FindDefaultConfig() / LoadFromFile()
-    loader->>conf: ファイル値で上書き
+    mgr->>loader: FindDefaultConfig() / LoadFromFiles()
+    Note over loader: .conf はマニフェスト展開、複数ファイルを順にマージ
+    loader->>conf: ファイル値で上書き（後勝ち）
     mgr->>conf: CLI値で上書き（指定されたフィールドのみ）
     mgr-->>main: Config（解決済み）
 ```
@@ -105,13 +109,15 @@ graph LR
     subgraph include/config/
         A["config_loader.hpp\nConfig / PluginConfig / SubcommandMapping 構造体"]
         B["config_schema.hpp\nFieldDescriptor / kConfigSchema"]
-        C["config_file_loader.hpp\nLoadFromFile / FindDefaultConfig"]
+        C["config_file_loader.hpp\nLoadFromFile / LoadFromFiles\nExpandManifest / FindDefaultConfig"]
         D["config_manager.hpp\nConfigManager"]
+        CV["config_validator.hpp\nValidate"]
     end
     subgraph src/config/
         E["config_loader.cpp\n（スタブ）"]
-        F["config_file_loader.cpp\nTOML / JSONC / YAML 実装"]
+        F["config_file_loader.cpp\nTOML / JSONC / YAML / .conf 実装"]
         G["config_manager.cpp\nConfigManager 実装"]
+        GV["config_validator.cpp\nValidate 実装"]
     end
     subgraph src/command/
         H["subcommand.cpp\nkSubcommandMappings 実体定義"]
@@ -170,8 +176,8 @@ inline constexpr auto kConfigSchema = std::make_tuple(
 class ConfigManager {
 public:
     void RegisterOptions(CLI::App& app);
-    Config Resolve(const std::string& explicit_config_path); // スキーマフィールドのみ解決
-    const Config& GetFileValues() const;                     // ファイルの生値（スキーマ外フィールド取得用）
+    Config Resolve(const std::vector<std::string>& config_paths); // スキーマフィールドのみ解決
+    const Config& GetFileValues() const;                          // ファイルの生値（スキーマ外フィールド取得用）
 private:
     Config cli_values_;         // CLI11のパース結果書き込み先
     Config file_values_;        // 設定ファイルから読み込んだ値（Resolve() 後に有効）
@@ -180,8 +186,9 @@ private:
 ```
 
 `Resolve()` はスキーマ定義フィールド（`kConfigSchema` に列挙されたもの）のみを解決して返す。
+`config_paths` が空の場合はデフォルト探索を行い、`.conf` ファイルはマニフェストとして展開する。
 `plugins` や `SubcommandConfig` などスキーマ外の複合型フィールドは `GetFileValues()` で取得し、
-呼び出し元（`cli.cpp`）でマージする。
+呼び出し元（`cli.cpp`）の `MergeNonSchemaFields()` でマージする。
 
 `cli_values_` はスキーマサイズ分のフィールドを持つ `Config`。
 `cli_set_` はどのフィールドが実際にCLIで指定されたかを記録するフラグ配列。
@@ -256,29 +263,42 @@ std::apply(
 );
 ```
 
-### ドット区切りキーの再帰解決
+### ドット区切りキーの解決
 
 設定ファイルのネストを `"settings.value"` のようなドット区切り文字列で表現し、
-再帰関数でノードを辿る。TOML / JSON / YAML の各パーサーで同じパターンを実装している。
+共通テンプレート `ResolveDottedKey<Accessor, T>` でノードを辿る。
+
+各フォーマットは `GetChild`（子ノード取得）と `GetLeaf`（葉の値取得）の
+2メソッドを持つアクセサ構造体で差異を吸収する。
 
 ```cpp
-// TOML の例（JSON・YAML も同様のパターン）
-template <typename T>
-std::optional<T> ResolveTomlKey(const toml::table &tbl, std::string_view dotted_key) {
-    const auto dot_pos = dotted_key.find('.');
-    if (dot_pos == std::string_view::npos) {
-        // リーフノードに到達 → 値を取得
-        return tbl[dotted_key].template value<T>();
+// 共通テンプレート
+template <typename Accessor, typename T, typename Node>
+std::optional<T> ResolveDottedKey(const Node &root, std::string_view dotted_key) {
+    const Node *current = &root;
+    std::string_view remaining = dotted_key;
+    while (true) {
+        const auto dot_pos = remaining.find('.');
+        if (dot_pos == std::string_view::npos) {
+            return Accessor::template GetLeaf<T>(*current, std::string(remaining));
+        }
+        const auto head = std::string(remaining.substr(0, dot_pos));
+        remaining = remaining.substr(dot_pos + 1);
+        current = Accessor::GetChild(*current, head);
+        if (current == nullptr) { return std::nullopt; }
     }
-    // ドットで分割して再帰
-    const auto head = dotted_key.substr(0, dot_pos); // "settings"
-    const auto tail = dotted_key.substr(dot_pos + 1); // "value"
-    const auto *nested = tbl[head].as_table();
-    if (nested == nullptr) {
-        return std::nullopt; // キーが存在しない → スキップ
-    }
-    return ResolveTomlKey<T>(*nested, tail);
 }
+
+// TOML アクセサの例（JSON・YAML も同様のパターン）
+struct TomlAccessor {
+    static const toml::table *GetChild(const toml::table &node, const std::string &key) {
+        return node[key].as_table();
+    }
+    template <typename T>
+    static std::optional<T> GetLeaf(const toml::table &node, const std::string &key) {
+        return node[key].template value<T>();
+    }
+};
 ```
 
 戻り値に `std::optional<T>` を使うことで「キーが存在しない」と「値が0や空文字列」を区別し、
@@ -288,8 +308,8 @@ std::optional<T> ResolveTomlKey(const toml::table &tbl, std::string_view dotted_
 
 ```mermaid
 flowchart TD
-    A[Config result をデフォルト値で初期化] --> B{config_path は空か？}
-    B -- No --> C[LoadFromFile でファイル値を読み込み]
+    A[Config result をデフォルト値で初期化] --> B{config_paths は空か？}
+    B -- No --> C["LoadFromFiles で順にマージ\n（.conf はマニフェスト展開）"]
     B -- Yes --> D[FindDefaultConfig でデフォルトファイルを探索]
     D --> E{ファイルが見つかったか？}
     E -- Yes --> C

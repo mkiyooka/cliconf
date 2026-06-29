@@ -43,16 +43,16 @@ inline constexpr auto kConfigSchema = std::make_tuple(
 
 CLI::App app{"My App"};
 
-std::string config_file;
-app.add_option("-c,--config", config_file, "Configuration file");
+std::vector<std::string> config_files;
+app.add_option("-c,--config", config_files, "Configuration file(s)");
 
 config::ConfigManager mgr;
 mgr.RegisterOptions(app);   // スキーマ由来の全オプションを登録
 
 app.parse(argc, argv);
 
-// スキーマフィールドを解決（CLI引数 > 設定ファイル > デフォルト値）
-Config conf = mgr.Resolve(config_file);
+// スキーマフィールドを解決（CLI引数 > 後方ファイル > 前方ファイル > デフォルト値）
+Config conf = mgr.Resolve(config_files);
 
 // スキーマ外フィールド（plugins 等）はファイルの生値から取得
 const Config &file_vals = mgr.GetFileValues();
@@ -120,19 +120,22 @@ logging:
 
 ```sh
 # デフォルト設定ファイル（config/default.toml 等）を自動探索
-./build/cmd_cli11
+./build/cmd
 
 # 設定ファイルを明示指定
-./build/cmd_cli11 -c config/example.toml
+./build/cmd -c config/example.toml
 
-# CLI 引数で設定ファイルの値を上書き（優先度: CLI > ファイル > デフォルト）
-./build/cmd_cli11 -c config/example.toml --title="Override Title" --settings.value=99
+# 複数ファイルを指定（後勝ちマージ）
+./build/cmd -c config/base.toml -c config/override.toml
+
+# マニフェストで組み合わせを定義
+./build/cmd -c config/experiment.conf
+
+# CLI 引数で設定ファイルの値を上書き（優先度: CLI > 後方ファイル > 前方ファイル > デフォルト）
+./build/cmd -c config/example.toml --title="Override Title" --settings.value=99
 
 # 設定ファイルなしで CLI 引数のみ使用
-./build/cmd_cli11 --title="CLI Only"
-
-# 現在の全設定値を確認する
-./build/cmd_cli11 -c config/example.toml
+./build/cmd --title="CLI Only"
 ```
 
 ---
@@ -149,6 +152,62 @@ logging:
 
 ```text
 Error: Multiple default config files found: config/default.toml config/default.json
+```
+
+---
+
+## 複数設定ファイルの指定
+
+`--config`（`-c`）は複数回指定できる。後に指定したファイルが前のファイルを上書きする（後勝ちマージ）。
+
+```sh
+# base.toml の値を override.toml で部分的に上書き
+./build/cmd -c config/base.toml -c config/override.toml add 1 2
+```
+
+各ファイルには全フィールドを書く必要はない。ファイルに存在するキーのみが上書きされる。
+
+---
+
+## マニフェストファイル (.conf)
+
+`.conf` 拡張子のファイルはマニフェスト（ファイルリスト）として扱われ、
+中に列挙したファイルを順に読み込む。
+
+```conf
+# experiment/case_001.conf
+# 1行1パス。# 以降はコメント。空行は無視。
+
+app_base.toml
+modules/moduleA1.toml
+modules/moduleB2.toml
+```
+
+相対パスはマニフェストファイルの親ディレクトリからの相対パスとして解決される。
+
+```sh
+# マニフェスト1つで複数ファイルの組み合わせを指定
+./build/cmd -c experiment/case_001.conf add 1 2
+
+# マニフェストと直接指定を混在させることもできる
+./build/cmd -c experiment/case_001.conf -c config/extra.toml add 1 2
+```
+
+### 典型的な使い方
+
+実験条件ごとにマニフェストを作成し、共通設定とモジュール設定を組み合わせる。
+
+```text
+- config/
+    - app_base.toml
+    - modules/
+        - moduleA1.toml
+        - moduleA2.toml
+        - moduleB1.toml
+        - moduleB2.toml
+- experiment/
+    - case_001.conf     … app_base + moduleA1 + moduleB2
+    - case_002.conf     … app_base + moduleA2 + moduleB1
 ```
 
 ---

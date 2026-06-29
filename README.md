@@ -127,24 +127,34 @@ pixi run valgrind
 
 CLI 引数・設定ファイル・デフォルト値を統合管理する。
 
-**優先度**: CLI 引数 > 設定ファイル > デフォルト値
+**優先度**: CLI 引数 > 後方の設定ファイル > 前方の設定ファイル > デフォルト値
+
+`--config`（`-c`）は複数回指定可能で、後に指定したファイルが前のファイルを上書きする。
+`.conf` 拡張子のファイルはマニフェスト（ファイルリスト）として展開される。
 
 > **注意**: `plugins` などの複合型フィールドは設定ファイル専用であり、CLI からの指定には対応しない。
 
 対応フォーマット:
 
-| 拡張子           | 形式  | 備考              |
-| ---------------- | ----- | ----------------- |
-| `.toml`          | TOML  |                   |
-| `.json`          | JSONC | `//` コメント対応 |
-| `.yaml` / `.yml` | YAML  |                   |
+| 拡張子           | 形式       | 備考                                    |
+| ---------------- | ---------- | --------------------------------------- |
+| `.toml`          | TOML       |                                         |
+| `.json`          | JSONC      | `//` コメント対応                       |
+| `.yaml` / `.yml` | YAML       |                                         |
+| `.conf`          | マニフェスト | 1行1パス、`#` コメント対応             |
 
 ```bash
 # 設定ファイルを指定して実行
-./build/template_cli_app_cpp --config config/example.toml add 10 20
+./build/cmd --config config/example.toml add 10 20
 
-# CLI 引数で設定値を上書き（ファイルより優先）
-./build/template_cli_app_cpp --config config/example.toml --settings.value=99 add 10 20
+# 複数ファイルを指定（後勝ちマージ）
+./build/cmd -c config/base.toml -c config/override.toml add 10 20
+
+# マニフェストで組み合わせを定義
+./build/cmd -c config/experiment.conf add 10 20
+
+# CLI 引数で設定値を上書き（最優先）
+./build/cmd -c config/example.toml --settings.value=99 add 10 20
 ```
 
 `--config` を省略した場合、`config/default.{toml,json,yaml}` を自動探索する（複数存在はエラー）。
