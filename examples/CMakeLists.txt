@@ -18,6 +18,18 @@ target_link_libraries(example_json_wrapper PRIVATE
     yyjson
 )
 
+# compat layer example (expected + span)
+add_executable(example_compat
+    example_compat.cpp
+)
+target_include_directories(example_compat PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(example_compat PRIVATE
+    tl::expected
+    tcb_span_target
+)
+
 # Output system example (Logger + DataRecorder)
 add_executable(example_output
     example_output.cpp

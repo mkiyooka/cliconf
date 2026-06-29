@@ -136,6 +136,7 @@ target_link_libraries(template_cli_app_cpp INTERFACE
     $<BUILD_INTERFACE:yyjson>
     $<BUILD_INTERFACE:csv>
     $<BUILD_INTERFACE:tl::expected>
+    $<BUILD_INTERFACE:tcb_span_target>
 )
 
 # ==============================================================================

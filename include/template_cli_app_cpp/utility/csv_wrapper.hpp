@@ -1,6 +1,6 @@
 #pragma once
 #include <csv.hpp>
-#include <tl/expected.hpp>
+#include <template_cli_app_cpp/compat/expected.hpp>
 #include <functional>
 #include <string>
 #include <vector>
@@ -56,13 +56,13 @@ public:
      *         （要素順: 行0の列0, 行0の列1, ..., 行1の列0, ...）
      *         失敗時: エラーメッセージ文字列
      */
-    tl::expected<std::vector<double>, std::string> ReadFiltered(
+    compat::expected<std::vector<double>, std::string> ReadFiltered(
         std::function<bool(const csv::CSVRow &)> predicate,
         const std::vector<std::string> &output_cols) const {
         csv::CSVReader csv_reader(path_);
         auto indices_result = ResolveIndices(csv_reader, output_cols);
         if (!indices_result) {
-            return tl::unexpected(indices_result.error());
+            return compat::unexpected(indices_result.error());
         }
         const auto &indices = *indices_result;
         std::vector<double> result;
@@ -91,13 +91,13 @@ public:
      * @return 成功時: 出力対象行の指定列を列挙した string の配列
      *         失敗時: エラーメッセージ文字列
      */
-    tl::expected<std::vector<std::string>, std::string> ReadFilteredAsStrings(
+    compat::expected<std::vector<std::string>, std::string> ReadFilteredAsStrings(
         std::function<bool(const csv::CSVRow &)> predicate,
         const std::vector<std::string> &output_cols) const {
         csv::CSVReader csv_reader(path_);
         auto indices_result = ResolveIndices(csv_reader, output_cols);
         if (!indices_result) {
-            return tl::unexpected(indices_result.error());
+            return compat::unexpected(indices_result.error());
         }
         const auto &indices = *indices_result;
         std::vector<std::string> result;
@@ -124,14 +124,14 @@ public:
      * @param out         結果を書き込む vector（クリアしてから追記する）
      * @return 成功時: void、失敗時: エラーメッセージ文字列
      */
-    tl::expected<void, std::string> ReadFiltered(
+    compat::expected<void, std::string> ReadFiltered(
         std::function<bool(const csv::CSVRow &)> predicate,
         const std::vector<std::string> &output_cols,
         std::vector<double> &out) const {
         csv::CSVReader csv_reader(path_);
         auto indices_result = ResolveIndices(csv_reader, output_cols);
         if (!indices_result) {
-            return tl::unexpected(indices_result.error());
+            return compat::unexpected(indices_result.error());
         }
         const auto &indices = *indices_result;
         out.clear();
@@ -158,14 +158,14 @@ public:
      * @param out         結果を書き込む vector（クリアしてから追記する）
      * @return 成功時: void、失敗時: エラーメッセージ文字列
      */
-    tl::expected<void, std::string> ReadFilteredAsStrings(
+    compat::expected<void, std::string> ReadFilteredAsStrings(
         std::function<bool(const csv::CSVRow &)> predicate,
         const std::vector<std::string> &output_cols,
         std::vector<std::string> &out) const {
         csv::CSVReader csv_reader(path_);
         auto indices_result = ResolveIndices(csv_reader, output_cols);
         if (!indices_result) {
-            return tl::unexpected(indices_result.error());
+            return compat::unexpected(indices_result.error());
         }
         const auto &indices = *indices_result;
         out.clear();
@@ -186,7 +186,7 @@ private:
      * @brief 列名リストをインデックスに解決する共通実装
      * @return 成功時: インデックスの vector、失敗時: エラーメッセージ文字列
      */
-    static tl::expected<std::vector<int>, std::string> ResolveIndices(
+    static compat::expected<std::vector<int>, std::string> ResolveIndices(
         csv::CSVReader &csv_reader,
         const std::vector<std::string> &cols) {
         std::vector<int> indices;
@@ -194,7 +194,7 @@ private:
         for (const auto &col : cols) {
             int idx = csv_reader.index_of(col);
             if (idx < 0) {
-                return tl::unexpected<std::string>(
+                return compat::unexpected<std::string>(
                     "utility::CsvReader: column not found: " + col);
             }
             indices.push_back(idx);
