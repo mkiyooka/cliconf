@@ -129,10 +129,8 @@ target_include_directories(template_cli_app_cpp INTERFACE
 )
 
 # ビルド時のみリンク（FetchContent依存はインストール対象外）
-# インストール後の利用者は find_package(fmt) / find_package(spdlog) 等で自前解決する
+# インストール後の利用者は find_package(yyjson) 等で自前解決する
 target_link_libraries(template_cli_app_cpp INTERFACE
-    $<BUILD_INTERFACE:fmt::fmt>
-    $<BUILD_INTERFACE:spdlog::spdlog>
     $<BUILD_INTERFACE:yyjson>
     $<BUILD_INTERFACE:csv>
     $<BUILD_INTERFACE:tl::expected>

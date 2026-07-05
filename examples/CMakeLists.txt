@@ -30,15 +30,3 @@ target_link_libraries(example_compat PRIVATE
     tcb_span_target
 )
 
-# Output system example (Logger + DataRecorder)
-add_executable(example_output
-    example_output.cpp
-)
-target_include_directories(example_output PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-)
-target_link_libraries(example_output PRIVATE
-    fmt::fmt
-    spdlog::spdlog
-    yyjson
-)

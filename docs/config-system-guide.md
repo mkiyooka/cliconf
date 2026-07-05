@@ -285,3 +285,131 @@ CLI 引数 > 設定ファイルの subcommands 値 > デフォルト値 (0)
 サブコマンドを CLI で指定した場合（例: `./build/cmd add 3 4`）、
 CLI の値が使われ、設定ファイルの値は無視される。
 サブコマンドが指定されなかった場合は設定ファイルの値が使われる。
+
+---
+
+## 他プロジェクトへの移植
+
+config-system はファイルをコピーして移植できる。
+`Config` 構造体とスキーマ定義がアプリ固有のため、コピー後に改変が必要なファイルと、
+汎用ロジックのためそのまま使えるファイルに分かれる。
+
+### 必要な外部ライブラリ
+
+| ライブラリ | 用途 |
+| --- | --- |
+| CLI11 | CLI オプション解析 |
+| toml++ | TOML ファイルの読み込み |
+| nlohmann/json | JSONC ファイルの読み込み |
+| fkYAML | YAML ファイルの読み込み |
+| fmt | フォーマット出力 |
+
+### コピーするファイル
+
+#### そのままコピーして使うファイル（改変不要）
+
+```text
+include/config/
+    config_manager.hpp
+
+src/config/
+    config_file_loader.hpp
+    config_file_loader.cpp
+    config_manager.cpp
+    config_loader.cpp
+    config_validator.cpp
+```
+
+`config_validator.cpp` のバリデーションルールはアプリ固有だが、
+関数シグネチャ（`Validate(const Config&) -> std::string`）はそのまま使える。
+
+#### コピーして改変するファイル
+
+**`include/config/config_loader.hpp`** — `Config` 構造体の定義
+
+`Config` のフィールドを移植先アプリ用に書き換える。
+`SubcommandMapping` と `kSubcommandMappings` の宣言はサブコマンドが不要な場合も残す（`config_file_loader.cpp` から参照されるため）。
+
+```cpp
+// 移植先で書き換える例
+struct Config {
+    std::string mode = "default";   // アプリ固有のフィールドに置き換える
+    int retry_count  = 3;
+    // SubcommandConfig は不要なら削除してよい
+};
+```
+
+**`include/config/config_schema.hpp`** — `kConfigSchema` のエントリ
+
+`Config` のフィールドに合わせてエントリを書き換える。
+
+```cpp
+inline constexpr auto kConfigSchema = std::make_tuple(
+    FieldDescriptor{"--mode",         "mode",         "Operation mode", &Config::mode},
+    FieldDescriptor{"--retry-count",  "retry_count",  "Retry count",    &Config::retry_count}
+);
+```
+
+**`src/command/subcommand.cpp`** — `kSubcommandMappings` の実体定義
+
+サブコマンドが変われば書き換える。サブコマンドが不要な場合は配列を空にする。
+
+```cpp
+const SubcommandMapping kSubcommandMappings[] = {};
+const std::size_t kSubcommandMappingCount = 0;
+```
+
+### 移植先で新規作成するファイル
+
+`src/command/cli.cpp` に相当するファイルをアプリ固有ロジックとして新規作成する。
+[src/command/cli.cpp](../src/command/cli.cpp) の `BuildApp` / `MergeNonSchemaFields` / `RunCli` を参考に、
+移植先の `Config` フィールドに合わせて実装する。
+
+```cpp
+// 最小構成の例
+int RunCli(int argc, char* argv[]) {
+    CLI::App app{"My App"};
+
+    std::vector<std::string> config_files;
+    app.add_option("-c,--config", config_files, "Configuration file(s)");
+
+    config::ConfigManager mgr;
+    mgr.RegisterOptions(app);
+
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::CallForHelp& e) {
+        std::exit(app.exit(e));
+    }
+
+    Config conf = mgr.Resolve(config_files);
+
+    // スキーマ外フィールド（plugins 等）はファイルの生値から手動マージ
+    const Config& file_vals = mgr.GetFileValues();
+    conf.plugins = file_vals.plugins;
+
+    const std::string error = config::Validate(conf);
+    if (!error.empty()) {
+        fmt::print(stderr, "Error: {}\n", error);
+        return 1;
+    }
+
+    // アプリ固有の処理
+    return 0;
+}
+```
+
+### ファイル一覧まとめ
+
+| 対応 | ファイル |
+| --- | --- |
+| そのままコピー | `include/config/config_manager.hpp` |
+| そのままコピー | `src/config/config_file_loader.hpp` |
+| そのままコピー | `src/config/config_file_loader.cpp` |
+| そのままコピー | `src/config/config_manager.cpp` |
+| そのままコピー | `src/config/config_loader.cpp` |
+| そのままコピー | `src/config/config_validator.cpp` |
+| コピーして改変 | `include/config/config_loader.hpp`（`Config` 構造体） |
+| コピーして改変 | `include/config/config_schema.hpp`（`kConfigSchema` のエントリ） |
+| コピーして改変 | `src/command/subcommand.cpp`（`kSubcommandMappings` の実体） |
+| 新規作成 | `cli.cpp` 相当（`BuildApp` / `RunCli`） |

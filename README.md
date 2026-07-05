@@ -60,7 +60,6 @@ pixi run test     # テスト実行
 | nlohmann/json | 3.12.0     | JSON / JSONC 設定ファイル解析 |
 | yyjson        | 0.12.0     | 高速 JSON 読み書き            |
 | fkYAML        | 0.4.2      | YAML 設定ファイル解析         |
-| spdlog        | 1.17.0     | ロギング                      |
 
 ### テスト・ベンチマーク
 
@@ -169,7 +168,6 @@ flowchart TD
     CLI --> Exec["サブコマンド実行"]
     Config --> |"TOML / JSON / YAML"| Files["設定ファイル"]
     Config --> Validate["バリデーション"]
-    CLI -.-> Output["出力システム — logging / recording"]
 ```
 
 ## ディレクトリ構成
@@ -181,9 +179,6 @@ flowchart TD
     - `command/` — CLI インターフェース（カスタマイズ対象）
     - `config/` — 設定システム（カスタマイズ対象）
     - `template_cli_app_cpp/` — 汎用ライブラリ層（変更不要）
-        - `logging/` — Logger インターフェース・spdlog ラッパー・ファクトリ
-        - `recording/` — DataRecorder インターフェース・spdlog ラッパー・ファクトリ
-        - `output/` — OutputContext DI コンテキスト
         - `utility/` — yyjson ラッパー（JsonBuilder）
 - `tests/` — テストコード（doctest）
     - `support/` — テスト用ユーティリティ（SpyLogger, TempFile, doctest サンプル）
@@ -199,7 +194,7 @@ flowchart TD
 
 **変更不要（汎用ライブラリ層）**:
 
-- `include/template_cli_app_cpp/` — logging / recording / output / utility
+- `include/template_cli_app_cpp/` — utility（yyjson ラッパー）・compat（expected / span）
 
 **変更対象（CLIテンプレート層）**:
 
@@ -214,5 +209,3 @@ flowchart TD
 - [docs/build-system.md](docs/build-system.md) — ビルドシステム・開発ツールの詳細
 - [docs/config-system.md](docs/config-system.md) — 設定システムの仕様
 - [docs/config-system-guide.md](docs/config-system-guide.md) — 設定システムの拡張ガイド
-- [docs/output-system.md](docs/output-system.md) — 出力システムの仕様
-- [docs/output-system-guide.md](docs/output-system-guide.md) — 出力システムの拡張ガイド
