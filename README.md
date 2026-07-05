@@ -207,5 +207,7 @@ flowchart TD
 ## ドキュメント
 
 - [docs/build-system.md](docs/build-system.md) — ビルドシステム・開発ツールの詳細
-- [docs/config-system.md](docs/config-system.md) — 設定システムの仕様
-- [docs/config-system-guide.md](docs/config-system-guide.md) — 設定システムの拡張ガイド
+- [docs/config-system.md](docs/config-system.md) — 設定システムの設計概要
+- [docs/config-system-guide.md](docs/config-system-guide.md) — 設定システムの利用ガイド（フィールド追加・設定ファイル書き方）
+- [docs/config-system-internals.md](docs/config-system-internals.md) — 設定システムの実装解説（FieldDescriptor・std::apply 等）
+- [docs/config-system-porting.md](docs/config-system-porting.md) — 設定システムを既存プロジェクトへ移植する手順
