@@ -107,8 +107,10 @@ include(cmake/coverage-flags.cmake)
 # FETCHCONTENT_BASE_DIR をプロジェクトルート直下の _deps に固定することで
 # build / build-asan / build-coverage 間でダウンロード・展開済みソースを共有し
 # 各プリセットの初回 configure 時の再ダウンロードを防ぐ
-set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/_deps" CACHE PATH
-    "FetchContent shared source cache" FORCE)
+if(PROJECT_IS_TOP_LEVEL)
+    set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/_deps" CACHE PATH
+        "FetchContent shared source cache")
+endif()
 include(FetchContent)
 include(cmake/local-or-fetch.cmake)
 include(cmake/dependencies-app.cmake)
@@ -219,18 +221,20 @@ configure_file(
     @ONLY
 )
 
-add_subdirectory(tests)
-add_subdirectory(benches)
-add_subdirectory(examples)
+if(PROJECT_IS_TOP_LEVEL)
+    add_subdirectory(tests)
+    add_subdirectory(benches)
+    add_subdirectory(examples)
 
-# カスタムターゲット
-include(cmake/custom-targets.cmake)
+    # カスタムターゲット
+    include(cmake/custom-targets.cmake)
 
-# カバレッジ
-include(cmake/coverage.cmake)
+    # カバレッジ
+    include(cmake/coverage.cmake)
 
-# コード品質ツール
-include(cmake/quality-setup.cmake)
+    # コード品質ツール
+    include(cmake/quality-setup.cmake)
+endif()
 
 # ==============================================================================
 # Third-Party License Aggregation
