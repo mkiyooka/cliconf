@@ -3,9 +3,9 @@
 # doctest - Testing framework
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
-add_external_package(doctest ext/doctest-2.4.12
-    URL https://github.com/doctest/doctest/archive/refs/tags/v2.4.12.tar.gz
-    URL_HASH SHA256=73381c7aa4dee704bd935609668cf41880ea7f19fa0504a200e13b74999c2d70
+add_external_package(doctest ext/doctest-2.5.3
+    URL https://github.com/doctest/doctest/archive/refs/tags/v2.5.3.tar.gz
+    URL_HASH SHA256=174ebc4e769928959614789c5b4e9c3d0a0f81a62bb608756b127bfebfb21331
 )
 FetchContent_MakeAvailable(doctest)
 
@@ -17,9 +17,9 @@ add_external_package(nanobench ext/nanobench-4.3.11
 FetchContent_MakeAvailable(nanobench)
 
 # csv-parser - CSV reading library
-add_external_package(csv_parser ext/csv-parser-2.5.1
-    URL https://github.com/vincentlaucsb/csv-parser/archive/refs/tags/2.5.1.tar.gz
-    URL_HASH SHA256=da7128d4946872836f637d5e627cc555cd378e502d866a114a462241ee607da1
+add_external_package(csv_parser ext/csv-parser-5.3.0
+    URL https://github.com/vincentlaucsb/csv-parser/archive/refs/tags/5.3.0.tar.gz
+    URL_HASH SHA256=66911a50cfb347c47bc109a52bb01b1bf7bb35184466b6bda8bca8770a41576c
 )
 FetchContent_MakeAvailable(csv_parser)
 
