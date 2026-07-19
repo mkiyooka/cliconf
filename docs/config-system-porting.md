@@ -1,6 +1,10 @@
-# 設定システム 移植ガイド
+# 設定システム セットアップガイド
 
-このドキュメントは config-system を既存の C++ プロジェクトに移植する手順を説明する。
+このドキュメントは config-system を既存プロジェクトで使えるようにするための
+具体的な手順を説明する。FetchContent で取り込む方法とファイルコピーによる移植の
+両方に対応している。
+
+FetchContent による取り込みの概要は [README-library.md](../README-library.md) を参照。
 設計の概要は [config-system.md](config-system.md)、利用方法は [config-system-guide.md](config-system-guide.md)、
 実装の仕組みは [config-system-internals.md](config-system-internals.md) を参照。
 

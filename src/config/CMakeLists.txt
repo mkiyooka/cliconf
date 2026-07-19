@@ -8,6 +8,7 @@ set(CONFIG_SOURCES
 
 # Create config library
 add_library(config_lib STATIC ${CONFIG_SOURCES})
+add_library(cliconf::config ALIAS config_lib)
 target_include_directories(config_lib PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(config_lib PUBLIC
     CLI11::CLI11

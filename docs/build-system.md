@@ -104,7 +104,7 @@ ctest --preset=release
 
 ビルド後の主要な成果物は以下の場所に生成される。
 
-- `build/template_cli_app_cpp` — メインの実行ファイル
+- `build/cmd` — メインの実行ファイル
 - `build/test_*` — テストバイナリ
 - `build/bench_*` — ベンチマークバイナリ
 - `build/compile_commands.json` — LSP / clangd 向けの補完データベース（エディタはここを直接参照する）

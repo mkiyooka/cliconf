@@ -4,6 +4,8 @@ C++17 CLI アプリケーションのテンプレートプロジェクト。
 CLI11 を使ったサブコマンド構成と、TOML / JSON / YAML 対応の設定システムを備える。
 pixi による再現性の高い開発環境と、カバレッジ計測・コード品質ツールを提供する。
 
+> **FetchContent でライブラリとして取り込む場合は [README-library.md](README-library.md) を参照してください。**
+
 ## 必要条件
 
 - [pixi](https://prefix.dev/)
@@ -34,8 +36,8 @@ pixi run build    # ビルド
 pixi run test     # テスト実行
 
 # アプリ実行例
-./build/template_cli_app_cpp add 10 20
-./build/template_cli_app_cpp --config config/example.toml subtract 15 5
+./build/cmd add 10 20
+./build/cmd --config config/example.toml subtract 15 5
 ```
 
 ## 対応プラットフォーム
@@ -178,7 +180,7 @@ flowchart TD
 - `include/` — 公開ヘッダファイル
     - `command/` — CLI インターフェース（カスタマイズ対象）
     - `config/` — 設定システム（カスタマイズ対象）
-    - `template_cli_app_cpp/` — 汎用ライブラリ層（変更不要）
+    - `cliconf/` — 汎用ライブラリ層（変更不要）
         - `utility/` — yyjson ラッパー（JsonBuilder）
 - `tests/` — テストコード（doctest）
     - `support/` — テスト用ユーティリティ（SpyLogger, TempFile, doctest サンプル）
@@ -194,7 +196,7 @@ flowchart TD
 
 **変更不要（汎用ライブラリ層）**:
 
-- `include/template_cli_app_cpp/` — utility（yyjson ラッパー）・compat（expected / span）
+- `include/cliconf/` — utility（yyjson ラッパー）・compat（expected / span）
 
 **変更対象（CLIテンプレート層）**:
 
@@ -206,8 +208,9 @@ flowchart TD
 
 ## ドキュメント
 
+- [README-library.md](README-library.md) — FetchContent でライブラリとして取り込む場合の手引き
 - [docs/build-system.md](docs/build-system.md) — ビルドシステム・開発ツールの詳細
 - [docs/config-system.md](docs/config-system.md) — 設定システムの設計概要
 - [docs/config-system-guide.md](docs/config-system-guide.md) — 設定システムの利用ガイド（フィールド追加・設定ファイル書き方）
 - [docs/config-system-internals.md](docs/config-system-internals.md) — 設定システムの実装解説（FieldDescriptor・std::apply 等）
-- [docs/config-system-porting.md](docs/config-system-porting.md) — 設定システムを既存プロジェクトへ移植する手順
+- [docs/config-system-porting.md](docs/config-system-porting.md) — FetchContent 取り込み後のセットアップ手順

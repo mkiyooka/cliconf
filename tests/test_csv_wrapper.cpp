@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "support/temp_file.hpp"
-#include "template_cli_app_cpp/utility/csv_wrapper.hpp"
+#include "cliconf/utility/csv_wrapper.hpp"
 
 static const std::string kTestCsv =
     "flag,value,label\n"

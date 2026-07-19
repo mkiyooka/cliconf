@@ -1,7 +1,0 @@
-@PACKAGE_INIT@
-
-include(CMakeFindDependencyMacro)
-
-include("${CMAKE_CURRENT_LIST_DIR}/template_cli_app_cppTargets.cmake")
-
-check_required_components(template_cli_app_cpp)

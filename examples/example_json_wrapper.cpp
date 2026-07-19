@@ -1,4 +1,4 @@
-#include <template_cli_app_cpp/utility/yyjson_wrapper.hpp>
+#include <cliconf/utility/yyjson_wrapper.hpp>
 
 #include <iostream>
 #include <string>

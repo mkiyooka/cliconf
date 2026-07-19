@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include <template_cli_app_cpp/compat/expected.hpp>
-#include <template_cli_app_cpp/compat/span.hpp>
+#include <cliconf/compat/expected.hpp>
+#include <cliconf/compat/span.hpp>
 
 namespace {
 
