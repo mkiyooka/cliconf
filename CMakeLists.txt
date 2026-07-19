@@ -216,8 +216,8 @@ endif()
 include(CTest)
 
 configure_file(
-    ${CMAKE_SOURCE_DIR}/cmake/CTestCustom.cmake.in
-    ${CMAKE_BINARY_DIR}/CTestCustom.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CTestCustom.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake
     @ONLY
 )
 
@@ -246,7 +246,7 @@ add_custom_target(collect-licenses
 
     # FetchContentで取得したライブラリのライセンス
     COMMAND ${CMAKE_COMMAND} -E echo "Collecting FetchContent package licenses..."
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/collect-fetchcontent-licenses.cmake
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/collect-fetchcontent-licenses.cmake
 
     COMMENT "Collecting third-party library licenses"
 )
