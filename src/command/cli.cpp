@@ -26,7 +26,10 @@ void ShowConfig(const Config &conf) {
     }
 }
 
-void BuildApp(CLI::App &app, std::vector<std::string> &config_files, config::ConfigManager &config_manager, Config &config) {
+using AppConfigManager = config::ConfigManager<Config, decltype(config::kConfigSchema), config::AppExtraLoader>;
+
+void BuildApp(CLI::App &app, std::vector<std::string> &config_files, AppConfigManager &config_manager,
+              Config &config) {
     app.add_option("-c,--config", config_files, "Configuration file(s)");
     config_manager.RegisterOptions(app);
     SetCallbackSubcommands(app, config);
@@ -51,7 +54,7 @@ int RunCli(int argc, char *argv[]) {
     argv = app.ensure_utf8(argv);
 
     std::vector<std::string> config_files;
-    config::ConfigManager config_manager;
+    AppConfigManager config_manager{config::kConfigSchema, config::AppExtraLoader{}};
     Config config;
 
     BuildApp(app, config_files, config_manager, config);

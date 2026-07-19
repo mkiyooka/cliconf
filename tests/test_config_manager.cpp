@@ -5,18 +5,31 @@
 #include <stdexcept>
 #include <string>
 
+#include <CLI/CLI.hpp>
+
+#include "config/config_file_loader.hpp"
 #include "config/config_loader.hpp"
 #include "config/config_manager.hpp"
-#include "config_file_loader.hpp"
+#include "config/config_schema.hpp"
 #include "support/temp_file.hpp"
+
+// テスト用ヘルパー: このプロジェクトのスキーマ＋ExtraLoader を使う ConfigManager
+using TestConfigManager = config::ConfigManager<Config, decltype(config::kConfigSchema), config::AppExtraLoader>;
+
+static TestConfigManager MakeManager() {
+    return TestConfigManager{config::kConfigSchema, config::AppExtraLoader{}};
+}
+
+// テスト用ヘルパー: LoadFromFile をスキーマ＋ExtraLoader 付きで呼ぶ
+static void LoadConf(const std::string &path, Config &conf) {
+    config::LoadFromFile(path, config::kConfigSchema, conf, config::AppExtraLoader{});
+}
 
 // ──────────────────────────────────────────────
 // FindDefaultConfig のテスト
 // ──────────────────────────────────────────────
 
 TEST_CASE("FindDefaultConfig returns empty when no default file exists") {
-    // config/default.* が存在しないことを前提とする
-    // (テスト実行ディレクトリにデフォルトファイルがなければパス)
     if (!std::filesystem::exists("config/default.toml") && !std::filesystem::exists("config/default.json") &&
         !std::filesystem::exists("config/default.yaml")) {
         CHECK(config::FindDefaultConfig().empty());
@@ -36,7 +49,7 @@ value = 42
 )");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "TestApp");
     CHECK(conf.value == 42);
@@ -60,7 +73,7 @@ number = 2
 )");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "WithPlugins");
     CHECK(conf.plugins.size() == 2);
@@ -71,16 +84,15 @@ number = 2
 }
 
 TEST_CASE("LoadFromFile: TOML partial fields keep defaults") {
-    // title のみ設定、value は未設定 → デフォルト値が維持される
     const TempFile temp_file("test_config_partial.toml", R"(
 title = "PartialOnly"
 )");
 
-    Config conf; // デフォルト: title="title", value=10
-    config::LoadFromFile(temp_file.Str(), conf);
+    Config conf;
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "PartialOnly");
-    CHECK(conf.value == 10); // デフォルト値維持
+    CHECK(conf.value == 10);
 }
 
 // ──────────────────────────────────────────────
@@ -97,7 +109,7 @@ TEST_CASE("LoadFromFile: JSON basic fields") {
 })");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "JsonApp");
     CHECK(conf.value == 99);
@@ -114,7 +126,7 @@ TEST_CASE("LoadFromFile: JSON with plugins") {
 })");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "JsonPlugins");
     CHECK(conf.plugins.size() == 2);
@@ -134,7 +146,7 @@ settings:
 )");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "YamlApp");
     CHECK(conf.value == 77);
@@ -153,7 +165,7 @@ plugin:
 )");
 
     Config conf;
-    config::LoadFromFile(temp_file.Str(), conf);
+    LoadConf(temp_file.Str(), conf);
 
     CHECK(conf.title == "YamlPlugins");
     CHECK(conf.plugins.size() == 2);
@@ -168,7 +180,7 @@ plugin:
 TEST_CASE("LoadFromFile: unsupported extension throws") {
     const TempFile temp_file("test_config.xml", "<config/>");
     Config conf;
-    CHECK_THROWS_AS(config::LoadFromFile(temp_file.Str(), conf), std::runtime_error);
+    CHECK_THROWS_AS(LoadConf(temp_file.Str(), conf), std::runtime_error);
 }
 
 // ──────────────────────────────────────────────
@@ -183,7 +195,7 @@ title = "FromFile"
 value = 55
 )");
 
-    config::ConfigManager manager;
+    auto manager = MakeManager();
     const Config conf = manager.Resolve({temp_file.Str()});
 
     CHECK(conf.title == "FromFile");
@@ -199,24 +211,22 @@ value = 100
 )");
 
     CLI::App app{"test"};
-    config::ConfigManager manager;
+    auto manager = MakeManager();
     std::string config_path = temp_file.Str();
     app.add_option("-c,--config", config_path, "Config file");
     manager.RegisterOptions(app);
-    // vector形式でパース (プログラム名を除いた引数のみ)
     app.parse(std::vector<std::string>{"--settings.value=999"});
 
     const Config conf = manager.Resolve({config_path});
 
-    CHECK(conf.title == "FileTitle"); // ファイルから
-    CHECK(conf.value == 999);         // CLIが優先
+    CHECK(conf.title == "FileTitle");
+    CHECK(conf.value == 999);
 }
 
 TEST_CASE("ConfigManager::Resolve: empty path uses defaults") {
-    config::ConfigManager manager;
+    auto manager = MakeManager();
     const Config conf = manager.Resolve({});
 
-    // デフォルト値
     CHECK(conf.title == "title");
     CHECK(conf.value == 10);
     CHECK(conf.plugins.empty());

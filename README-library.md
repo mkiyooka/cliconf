@@ -30,8 +30,8 @@
 include(FetchContent)
 
 FetchContent_Declare(cliconf
-    GIT_REPOSITORY https://github.com/yourname/cliconf.git
-    GIT_TAG v0.1.0   # 使用するタグまたはコミットハッシュ
+    GIT_REPOSITORY https://github.com/mkiyooka/cliconf.git
+    GIT_TAG main   # 使用するタグまたはコミットハッシュ
 )
 FetchContent_MakeAvailable(cliconf)
 ```
@@ -56,67 +56,39 @@ target_link_libraries(my_app PRIVATE cliconf::config)
 
 # utility / compat ヘッダを使う場合
 target_link_libraries(my_app PRIVATE cliconf::cliconf)
-
-# 両方使う場合
-target_link_libraries(my_app PRIVATE
-    cliconf::config
-    cliconf::cliconf
-)
 ```
 
 ---
 
 ## config-system の使い方
 
-config-system は `Config` 構造体・スキーマ定義・`RunCli` がアプリ固有のため、
-取り込み後にそれぞれ定義する必要があります。
+config-system は `ConfigManager<Config, Schema, ExtraLoader>` というテンプレートクラスです。
+利用側で `Config` 構造体・スキーマ・ExtraLoader を定義して渡すことで、
+TOML / JSONC / YAML の読み込みと CLI11 オプション登録が自動化されます。
 
 ### ステップ1: Config 構造体を定義する
 
-取り込み側プロジェクトで `Config` と `kSubcommandMappings` を定義します。
-
 ```cpp
 // my_project/include/config/config_loader.hpp
-
 #pragma once
-#include <cstdint>
 #include <string>
-#include <vector>
 
 struct Config {
     std::string mode    = "default";
     int         timeout = 30;
 };
-
-// サブコマンドが不要な場合も宣言は残す（config_file_loader.cpp から参照される）
-struct SubcommandMapping {
-    const char *key;
-    // SubcommandConfig Config::*member;  // サブコマンドなしの場合はコメントアウト
-};
-extern const SubcommandMapping kSubcommandMappings[];
-extern const std::size_t kSubcommandMappingCount;
-```
-
-```cpp
-// my_project/src/subcommand.cpp
-#include "config/config_loader.hpp"
-
-const SubcommandMapping kSubcommandMappings[] = {};
-const std::size_t kSubcommandMappingCount = 0;
 ```
 
 ### ステップ2: スキーマを定義する
 
+`FieldDescriptor` は `cliconf/field_descriptor.hpp` で提供されます。
+
 ```cpp
 // my_project/include/config/config_schema.hpp
-
 #pragma once
 #include <tuple>
-#include <string_view>
+#include "cliconf/field_descriptor.hpp"
 #include "config/config_loader.hpp"
-
-// FieldDescriptor は取り込んだ側のヘッダから使える
-#include <config/config_schema_base.hpp>  // → このファイルは存在しない（後述の注意参照）
 
 namespace config {
 
@@ -128,30 +100,61 @@ inline constexpr auto kConfigSchema = std::make_tuple(
 } // namespace config
 ```
 
-> **注意**: `FieldDescriptor` は `include/config/config_schema.hpp` に定義されています。
-> 取り込み側では `kConfigSchema` だけを再定義します。`FieldDescriptor` 自体は
-> このプロジェクトのヘッダをインクルードして使います。
->
-> ```cpp
-> // FieldDescriptor の取得元
-> #include <config/config_schema.hpp>  // → FieldDescriptor テンプレートが使える
-> ```
->
-> ただし、このヘッダには `kConfigSchema` の定義も含まれるため、
-> **取り込み側では `config_schema.hpp` を丸ごとコピーして置き換えてください**。
-> 詳細は [docs/config-system-porting.md](docs/config-system-porting.md) を参照。
+`FieldDescriptor` の4引数の意味:
 
-### ステップ3: ConfigManager を組み込む
+| 引数 | 例 | 説明 |
+| --- | --- | --- |
+| 第1引数 | `"--mode"` | CLI11 に登録するオプション名 |
+| 第2引数 | `"mode"` | 設定ファイルのキー（ドット区切りでネスト可） |
+| 第3引数 | `"Operation mode"` | CLI ヘルプに表示する説明文 |
+| 第4引数 | `&Config::mode` | Config 構造体のメンバーポインタ |
+
+### ステップ3: ExtraLoader を定義する（スキーマ外フィールドがある場合）
+
+`std::vector` などスキーマで自動マッピングできないフィールドは `ExtraLoader` で読み込みます。
+不要な場合は `config::NoExtraLoader`（デフォルト）をそのまま使えます。
+
+```cpp
+// my_project/include/config/config_schema.hpp（続き）
+#include <fkYAML/node.hpp>
+#include <nlohmann/json.hpp>
+#include <toml++/toml.hpp>
+#include "config/config_loader.hpp"
+
+namespace config {
+
+struct MyExtraLoader {
+    void LoadToml(const toml::table &tbl, Config &conf) const {
+        // 例: [[item]] 配列を読み込む
+        if (const auto *arr = tbl["item"].as_array()) {
+            conf.items.clear();
+            for (const auto &el : *arr) {
+                if (const auto *t = el.as_table()) {
+                    conf.items.push_back((*t)["name"].value_or(std::string{}));
+                }
+            }
+        }
+    }
+    void LoadJson(const nlohmann::json & /*j*/, Config & /*conf*/) const {}
+    void LoadYaml(const fkyaml::node & /*root*/, Config & /*conf*/) const {}
+};
+
+} // namespace config
+```
+
+スキーマ外フィールドが全くない場合は ExtraLoader の定義は不要です。
+
+### ステップ4: ConfigManager を組み込む
 
 ```cpp
 // my_project/src/main.cpp
-
 #include <cstdlib>
 #include <vector>
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
+#include "config/config_file_loader.hpp"
 #include "config/config_manager.hpp"
-#include "config/config_validator.hpp"
+#include "config/config_schema.hpp"
 
 int main(int argc, char *argv[]) {
     CLI::App app{"My Application"};
@@ -159,8 +162,9 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> config_files;
     app.add_option("-c,--config", config_files, "Configuration file(s)");
 
-    config::ConfigManager config_manager;
-    config_manager.RegisterOptions(app);   // スキーマ由来の全オプションを登録
+    // ConfigManager にスキーマと ExtraLoader を渡す
+    config::ConfigManager<Config, decltype(config::kConfigSchema)> manager{config::kConfigSchema};
+    manager.RegisterOptions(app);
 
     try {
         app.parse(argc, argv);
@@ -169,13 +173,7 @@ int main(int argc, char *argv[]) {
     }
 
     // CLI引数 > 後方ファイル > 前方ファイル > デフォルト値 の順で解決
-    Config conf = config_manager.Resolve(config_files);
-
-    const std::string error = config::Validate(conf);
-    if (!error.empty()) {
-        fmt::print(stderr, "Error: {}\n", error);
-        return 1;
-    }
+    Config conf = manager.Resolve(config_files);
 
     fmt::print("mode: {}\n", conf.mode);
     fmt::print("timeout: {}\n", conf.timeout);
@@ -183,20 +181,57 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### ステップ4: CMakeLists.txt でソースを追加する
+ExtraLoader を使う場合:
+
+```cpp
+config::ConfigManager<Config, decltype(config::kConfigSchema), config::MyExtraLoader> manager{
+    config::kConfigSchema, config::MyExtraLoader{}
+};
+```
+
+`Resolve()` 後にスキーマ外フィールドを取得するには `GetFileValues()` を使います:
+
+```cpp
+Config conf = manager.Resolve(config_files);
+const Config &file_vals = manager.GetFileValues();
+conf.items = file_vals.items;  // ExtraLoader が読み込んだ値
+```
+
+### ステップ5: CMakeLists.txt でビルドする
 
 ```cmake
-# サブコマンドマッピングの実体ファイルをビルドに含める
-add_executable(my_app
-    src/main.cpp
-    src/subcommand.cpp   # kSubcommandMappings の実体定義
-)
+add_executable(my_app src/main.cpp)
 
 target_include_directories(my_app PRIVATE include)
 
-target_link_libraries(my_app PRIVATE
-    cliconf::config
-)
+target_link_libraries(my_app PRIVATE cliconf::config)
+```
+
+---
+
+## 設定ファイルの書き方
+
+ドット区切りのキーはネストとして解釈されます。
+
+```cpp
+FieldDescriptor{"--server.host", "server.host", "Server hostname", &Config::server_host},
+```
+
+```toml
+# TOML
+[server]
+host = "example.com"
+```
+
+```json
+// JSONC
+{ "server": { "host": "example.com" } }
+```
+
+```yaml
+# YAML
+server:
+  host: example.com
 ```
 
 ---
@@ -227,7 +262,7 @@ auto result = reader.ReadFiltered(
     {"value_a", "value_b"}
 );
 
-// compat::expected（C++17 では tl::expected、C++23 では std::expected に自動切り替え）
+// compat::expected（C++23 で std::expected に自動切り替え）
 #include <cliconf/compat/expected.hpp>
 
 compat::expected<int, std::string> safe_divide(int a, int b) {

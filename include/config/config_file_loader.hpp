@@ -1,4 +1,4 @@
-#include "config_file_loader.hpp"
+#pragma once
 
 #include <algorithm>
 #include <filesystem>
@@ -14,11 +14,7 @@
 #include <nlohmann/json.hpp>
 #include <toml++/toml.hpp>
 
-#include "config/config_schema.hpp"
-
 namespace config {
-
-namespace {
 
 // ──────────────────────────────────────────────
 // ドット区切りキー解決（共通テンプレート）
@@ -62,48 +58,6 @@ struct TomlAccessor {
     }
 };
 
-void LoadFromToml(const std::string &file_path, Config &conf) {
-    const auto tbl = toml::parse_file(file_path);
-
-    std::apply(
-        [&](auto &&...field) {
-            (
-                [&] {
-                    using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveDottedKey<TomlAccessor, FieldType>(tbl, field.config_key);
-                    if (val.has_value()) {
-                        conf.*field.member = *val;
-                    }
-                }(),
-                ...
-            );
-        },
-        kConfigSchema
-    );
-
-    if (const auto *arr = tbl["plugin"].as_array()) {
-        conf.plugins.clear();
-        for (const auto &el : *arr) {
-            if (const auto *table = el.as_table()) {
-                PluginConfig plugin;
-                plugin.file = (*table)["file"].value_or(std::string{});
-                plugin.number = (*table)["number"].value_or(std::uint64_t{0});
-                conf.plugins.push_back(plugin);
-            }
-        }
-    }
-
-    if (const auto *subs = tbl["subcommands"].as_table()) {
-        for (std::size_t i = 0; i < kSubcommandMappingCount; ++i) {
-            const auto &mapping = kSubcommandMappings[i];
-            if (const auto *sub_tbl = (*subs)[mapping.key].as_table()) {
-                (conf.*mapping.member).a = (*sub_tbl)["a"].value_or(0);
-                (conf.*mapping.member).b = (*sub_tbl)["b"].value_or(0);
-            }
-        }
-    }
-}
-
 // ──────────────────────────────────────────────
 // JSON/JSONC アクセサ
 // ──────────────────────────────────────────────
@@ -124,48 +78,6 @@ struct JsonAccessor {
         return node.at(key).get<T>();
     }
 };
-
-void LoadFromJson(const std::string &file_path, Config &conf) {
-    std::ifstream ifs(file_path);
-    if (!ifs) {
-        throw std::runtime_error("Cannot open file: " + file_path);
-    }
-    const auto j = nlohmann::json::parse(
-        ifs, /*callback cb=*/nullptr,
-        /*allow_exceptions=*/true,
-        /*ignore_comments=*/true
-    );
-
-    std::apply(
-        [&](auto &&...field) {
-            (
-                [&] {
-                    using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveDottedKey<JsonAccessor, FieldType>(j, field.config_key);
-                    if (val.has_value()) {
-                        conf.*field.member = *val;
-                    }
-                }(),
-                ...
-            );
-        },
-        kConfigSchema
-    );
-
-    if (j.contains("plugin") && j.at("plugin").is_array()) {
-        conf.plugins.clear();
-        for (const auto &el : j.at("plugin")) {
-            PluginConfig plugin;
-            if (el.contains("file") && el.at("file").is_string()) {
-                plugin.file = el.at("file").get<std::string>();
-            }
-            if (el.contains("number") && el.at("number").is_number_unsigned()) {
-                plugin.number = el.at("number").get<std::uint64_t>();
-            }
-            conf.plugins.push_back(plugin);
-        }
-    }
-}
 
 // ──────────────────────────────────────────────
 // YAML アクセサ
@@ -188,19 +100,18 @@ struct YamlAccessor {
     }
 };
 
-void LoadFromYaml(const std::string &file_path, Config &conf) {
-    std::ifstream ifs(file_path);
-    if (!ifs) {
-        throw std::runtime_error("Cannot open file: " + file_path);
-    }
-    const auto root = fkyaml::node::deserialize(ifs);
+// ──────────────────────────────────────────────
+// スキーマ自動マッピング（各フォーマット共通）
+// ──────────────────────────────────────────────
 
+template <typename Config, typename Schema, typename Accessor, typename Node>
+void ApplySchema(const Schema &schema, const Node &root, Config &conf) {
     std::apply(
         [&](auto &&...field) {
             (
                 [&] {
                     using FieldType = std::remove_reference_t<decltype(conf.*field.member)>;
-                    auto val = ResolveDottedKey<YamlAccessor, FieldType>(root, field.config_key);
+                    auto val = ResolveDottedKey<Accessor, FieldType>(root, field.config_key);
                     if (val.has_value()) {
                         conf.*field.member = *val;
                     }
@@ -208,45 +119,91 @@ void LoadFromYaml(const std::string &file_path, Config &conf) {
                 ...
             );
         },
-        kConfigSchema
+        schema
     );
-
-    const auto key = std::string("plugin");
-    if (root.is_mapping() && root.contains(key) && root.at(key).is_sequence()) {
-        conf.plugins.clear();
-        for (const auto &el : root.at(key)) {
-            PluginConfig plugin;
-            if (el.is_mapping() && el.contains("file")) {
-                plugin.file = el.at("file").get_value<std::string>();
-            }
-            if (el.is_mapping() && el.contains("number")) {
-                plugin.number = el.at("number").get_value<std::uint64_t>();
-            }
-            conf.plugins.push_back(plugin);
-        }
-    }
 }
 
-} // namespace
+// ──────────────────────────────────────────────
+// ExtraLoader: スキーマ外フィールド読み込み拡張ポイント
+// ──────────────────────────────────────────────
+//
+// 利用側はスキーマ外フィールド（配列型など）の読み込みをここで定義する。
+// 未使用の場合は空の ExtraLoaders{} を渡す。
+//
+// 例:
+//   struct MyExtraLoaders {
+//       void LoadToml(const toml::table& tbl, MyConfig& conf) const {
+//           if (const auto* arr = tbl["items"].as_array()) { ... }
+//       }
+//       void LoadJson(const nlohmann::json& j, MyConfig& conf) const { ... }
+//       void LoadYaml(const fkyaml::node& root, MyConfig& conf) const { ... }
+//   };
+
+struct NoExtraLoader {
+    template <typename Node, typename Config>
+    void LoadToml(const Node & /*unused*/, Config & /*unused*/) const {}
+    template <typename Node, typename Config>
+    void LoadJson(const Node & /*unused*/, Config & /*unused*/) const {}
+    template <typename Node, typename Config>
+    void LoadYaml(const Node & /*unused*/, Config & /*unused*/) const {}
+};
 
 // ──────────────────────────────────────────────
-// 公開API
+// フォーマット別ローダー（テンプレート）
 // ──────────────────────────────────────────────
 
-void LoadFromFile(const std::string &file_path, Config &conf) {
+template <typename Config, typename Schema, typename ExtraLoader = NoExtraLoader>
+void LoadFromToml(const std::string &file_path, const Schema &schema, Config &conf,
+                  const ExtraLoader &extra = ExtraLoader{}) {
+    const auto tbl = toml::parse_file(file_path);
+    ApplySchema<Config, Schema, TomlAccessor>(schema, tbl, conf);
+    extra.LoadToml(tbl, conf);
+}
+
+template <typename Config, typename Schema, typename ExtraLoader = NoExtraLoader>
+void LoadFromJson(const std::string &file_path, const Schema &schema, Config &conf,
+                  const ExtraLoader &extra = ExtraLoader{}) {
+    std::ifstream ifs(file_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open file: " + file_path);
+    }
+    const auto j = nlohmann::json::parse(ifs, nullptr, true, true);
+    ApplySchema<Config, Schema, JsonAccessor>(schema, j, conf);
+    extra.LoadJson(j, conf);
+}
+
+template <typename Config, typename Schema, typename ExtraLoader = NoExtraLoader>
+void LoadFromYaml(const std::string &file_path, const Schema &schema, Config &conf,
+                  const ExtraLoader &extra = ExtraLoader{}) {
+    std::ifstream ifs(file_path);
+    if (!ifs) {
+        throw std::runtime_error("Cannot open file: " + file_path);
+    }
+    const auto root = fkyaml::node::deserialize(ifs);
+    ApplySchema<Config, Schema, YamlAccessor>(schema, root, conf);
+    extra.LoadYaml(root, conf);
+}
+
+// ──────────────────────────────────────────────
+// 公開 API
+// ──────────────────────────────────────────────
+
+template <typename Config, typename Schema, typename ExtraLoader = NoExtraLoader>
+void LoadFromFile(const std::string &file_path, const Schema &schema, Config &conf,
+                  const ExtraLoader &extra = ExtraLoader{}) {
     const auto ext = std::filesystem::path(file_path).extension().string();
     if (ext == ".toml") {
-        LoadFromToml(file_path, conf);
+        LoadFromToml(file_path, schema, conf, extra);
     } else if (ext == ".json") {
-        LoadFromJson(file_path, conf);
+        LoadFromJson(file_path, schema, conf, extra);
     } else if (ext == ".yaml" || ext == ".yml") {
-        LoadFromYaml(file_path, conf);
+        LoadFromYaml(file_path, schema, conf, extra);
     } else {
         throw std::runtime_error("Unsupported config file extension: " + ext);
     }
 }
 
-std::vector<std::string> ExpandManifest(const std::string &manifest_path) {
+inline std::vector<std::string> ExpandManifest(const std::string &manifest_path) {
     std::ifstream ifs(manifest_path);
     if (!ifs) {
         throw std::runtime_error("Cannot open manifest file: " + manifest_path);
@@ -263,7 +220,6 @@ std::vector<std::string> ExpandManifest(const std::string &manifest_path) {
         if (line[line.find_first_not_of(" \t")] == '#') {
             continue;
         }
-
         auto path = std::filesystem::path(line);
         if (path.is_relative()) {
             path = parent_dir / path;
@@ -274,20 +230,22 @@ std::vector<std::string> ExpandManifest(const std::string &manifest_path) {
     return result;
 }
 
-void LoadFromFiles(const std::vector<std::string> &file_paths, Config &conf) {
+template <typename Config, typename Schema, typename ExtraLoader = NoExtraLoader>
+void LoadFromFiles(const std::vector<std::string> &file_paths, const Schema &schema, Config &conf,
+                   const ExtraLoader &extra = ExtraLoader{}) {
     for (const auto &path : file_paths) {
         const auto ext = std::filesystem::path(path).extension().string();
         if (ext == ".conf") {
             for (const auto &expanded : ExpandManifest(path)) {
-                LoadFromFile(expanded, conf);
+                LoadFromFile(expanded, schema, conf, extra);
             }
         } else {
-            LoadFromFile(path, conf);
+            LoadFromFile(path, schema, conf, extra);
         }
     }
 }
 
-std::string FindDefaultConfig() {
+inline std::string FindDefaultConfig() {
     const std::vector<std::string> candidates = {
         "config/default.toml",
         "config/default.json",
