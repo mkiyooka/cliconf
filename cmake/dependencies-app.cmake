@@ -71,6 +71,9 @@ target_include_directories(fkYAML_target INTERFACE ${fkyaml_SOURCE_DIR}/include)
 
 # tl::expected - monadic error handling (header-only)
 # C++23 以降では std::expected が利用可能。切り替えは include/cliconf/compat/expected.hpp で行う。
+# tl_expected の CMakeLists.txt は BUILD_TESTING (親プロジェクトの include(CTest) で ON になる)
+# に連動して自身のテストを ALL ターゲットに含めるため、明示的に無効化する。
+set(EXPECTED_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_external_package(tl_expected third_party/expected-1.3.1
     URL https://github.com/TartanLlama/expected/archive/refs/tags/v1.3.1.tar.gz
     URL_HASH SHA256=9a04f4f472fbb5c30bf60402f1ca626c4a76987f867978d0b8a35d7ab3fb8fe7
