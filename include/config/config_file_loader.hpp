@@ -128,16 +128,24 @@ void ApplySchema(const Schema &schema, const Node &root, Config &conf) {
 // ──────────────────────────────────────────────
 //
 // 利用側はスキーマ外フィールド（配列型など）の読み込みをここで定義する。
-// 未使用の場合は空の ExtraLoaders{} を渡す。
+// 未使用の場合は NoExtraLoader をそのまま使う。
 //
 // 例:
-//   struct MyExtraLoaders {
-//       void LoadToml(const toml::table& tbl, MyConfig& conf) const {
-//           if (const auto* arr = tbl["items"].as_array()) { ... }
-//       }
+//   struct MyExtraLoader {
+//       void LoadToml(const toml::table& tbl, MyConfig& conf) const { ... }
 //       void LoadJson(const nlohmann::json& j, MyConfig& conf) const { ... }
 //       void LoadYaml(const fkyaml::node& root, MyConfig& conf) const { ... }
+//       void LoadCsv(MyConfig& conf) const {
+//           // conf.csv_file が空なら何もしない
+//           if (conf.csv_file.empty()) return;
+//           utility::CsvReader reader(conf.csv_file);
+//           auto result = reader.ReadFiltered(...);
+//           if (result) { conf.records = *result; }
+//       }
 //   };
+//
+// LoadCsv は Resolve() でスキーマ解決が終わった後に呼ばれる。
+// conf.csv_file など CSV パスフィールドはその時点で確定済み。
 
 struct NoExtraLoader {
     template <typename Node, typename Config>
@@ -146,6 +154,8 @@ struct NoExtraLoader {
     void LoadJson(const Node & /*unused*/, Config & /*unused*/) const {}
     template <typename Node, typename Config>
     void LoadYaml(const Node & /*unused*/, Config & /*unused*/) const {}
+    template <typename Config>
+    void LoadCsv(Config & /*unused*/) const {}
 };
 
 // ──────────────────────────────────────────────

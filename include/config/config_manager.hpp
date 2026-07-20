@@ -85,6 +85,8 @@ public:
             schema_
         );
 
+        extra_.LoadCsv(result);
+
         return result;
     }
 

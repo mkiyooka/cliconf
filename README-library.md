@@ -114,11 +114,21 @@ inline constexpr auto kConfigSchema = std::make_tuple(
 `std::vector` などスキーマで自動マッピングできないフィールドは `ExtraLoader` で読み込みます。
 不要な場合は `config::NoExtraLoader`（デフォルト）をそのまま使えます。
 
+`ExtraLoader` が実装できるメソッドは4種類です。
+
+| メソッド | 呼び出しタイミング |
+| --- | --- |
+| `LoadToml(const toml::table&, Config&)` | `.toml` 読み込み時、スキーマ自動マッピングの直後 |
+| `LoadJson(const nlohmann::json&, Config&)` | `.json` 読み込み時、スキーマ自動マッピングの直後 |
+| `LoadYaml(const fkyaml::node&, Config&)` | `.yaml/.yml` 読み込み時、スキーマ自動マッピングの直後 |
+| `LoadCsv(Config&)` | `Resolve()` でスキーマ・CLI 解決が完了した後（全ファイル読み込み後） |
+
 ```cpp
 // my_project/include/config/config_schema.hpp（続き）
 #include <fkYAML/node.hpp>
 #include <nlohmann/json.hpp>
 #include <toml++/toml.hpp>
+#include <cliconf/utility/csv_wrapper.hpp>
 #include "config/config_loader.hpp"
 
 namespace config {
@@ -137,6 +147,20 @@ struct MyExtraLoader {
     }
     void LoadJson(const nlohmann::json & /*j*/, Config & /*conf*/) const {}
     void LoadYaml(const fkyaml::node & /*root*/, Config & /*conf*/) const {}
+
+    // CSV ファイルパスが conf.register_csv に入っていれば読み込む。
+    // Resolve() 後に呼ばれるため、CLI / 設定ファイルで指定したパスが確定済み。
+    void LoadCsv(Config &conf) const {
+        if (conf.register_csv.empty()) return;
+        utility::CsvReader reader(conf.register_csv);
+        auto result = reader.ReadFiltered(
+            [](const csv::CSVRow &row) { return row["enabled"].get<int>() == 1; },
+            {"address", "value"}
+        );
+        if (result) {
+            conf.register_records = *result;
+        }
+    }
 };
 
 } // namespace config
@@ -233,6 +257,94 @@ host = "example.com"
 server:
   host: example.com
 ```
+
+---
+
+## CSV を設定の一部として扱う
+
+`ExtraLoader::LoadCsv` を使うと、CSV ファイルのパスを「設定値のひとつ」としてスキーマに登録し、
+`Resolve()` 後に自動的に CSV を読み込む仕組みを作れます。
+
+### 設計の考え方
+
+```text
+kConfigSchema で定義
+  └── conf.register_csv = "registers.csv"  ← TOML / CLI で上書き可能
+
+Resolve() 完了後
+  └── ExtraLoader::LoadCsv(conf) が呼ばれる
+        └── conf.register_csv を読んで conf.register_records に書き込む
+```
+
+CSV のパスがスキーマフィールドなので、設定ファイルや CLI オプション（`--register-csv`）で
+実行時に切り替えられます。
+
+### 実装例
+
+#### Config 構造体に CSV パスとベクタフィールドを追加する
+
+```cpp
+struct Config {
+    std::string mode        = "default";
+    std::string register_csv;              // CSV ファイルパス
+    std::vector<double> register_records;  // LoadCsv で書き込まれる
+};
+```
+
+#### スキーマに CSV パスフィールドを追加する
+
+```cpp
+inline constexpr auto kConfigSchema = std::make_tuple(
+    FieldDescriptor{"--mode",         "mode",         "Operation mode",        &Config::mode},
+    FieldDescriptor{"--register-csv", "register_csv", "Path to register CSV",  &Config::register_csv}
+);
+```
+
+```toml
+# config/default.toml
+mode = "prod"
+register_csv = "data/registers.csv"
+```
+
+#### ExtraLoader::LoadCsv で読み込む
+
+```cpp
+struct MyExtraLoader {
+    void LoadCsv(Config &conf) const {
+        if (conf.register_csv.empty()) return;
+        utility::CsvReader reader(conf.register_csv);
+        auto result = reader.ReadFiltered(
+            [](const csv::CSVRow &row) { return row["enabled"].get<int>() == 1; },
+            {"value"}
+        );
+        if (result) {
+            conf.register_records.clear();
+            for (double v : *result) {
+                conf.register_records.push_back(v);
+            }
+        }
+    }
+    void LoadToml(const toml::table &, Config &) const {}
+    void LoadJson(const nlohmann::json &, Config &) const {}
+    void LoadYaml(const fkyaml::node &, Config &) const {}
+};
+```
+
+#### 呼び出し側
+
+```cpp
+config::ConfigManager<Config, decltype(config::kConfigSchema), config::MyExtraLoader> manager{
+    config::kConfigSchema, config::MyExtraLoader{}
+};
+manager.RegisterOptions(app);
+app.parse(argc, argv);
+
+Config conf = manager.Resolve(config_files);
+// この時点で conf.register_records には CSV から読み込んだ値が入っている
+```
+
+CSV ファイルパスが空（未指定）のときは `LoadCsv` 内でスキップするため、
+CSV が不要な実行モードではパスを指定しなければ何も起きません。
 
 ---
 

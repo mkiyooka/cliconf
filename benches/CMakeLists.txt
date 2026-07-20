@@ -12,12 +12,3 @@ target_link_libraries(bench_json PRIVATE
     nanobench::nanobench
 )
 
-# CSV benchmark
-add_executable(bench_csv
-    bench_csv.cpp
-)
-target_include_directories(bench_csv PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(bench_csv PRIVATE
-    csv
-    nanobench::nanobench
-)

@@ -93,3 +93,10 @@ endif()
 # tcb::span のインターフェースライブラリを作成（header-only）
 add_library(tcb_span_target INTERFACE)
 target_include_directories(tcb_span_target INTERFACE ${tcb_span_SOURCE_DIR}/include)
+
+# csv-parser - CSV reading library (streaming, memory-efficient for large files)
+add_external_package(csv_parser third_party/csv-parser-5.3.0
+    URL https://github.com/vincentlaucsb/csv-parser/archive/refs/tags/5.3.0.tar.gz
+    URL_HASH SHA256=66911a50cfb347c47bc109a52bb01b1bf7bb35184466b6bda8bca8770a41576c
+)
+FetchContent_MakeAvailable(csv_parser)

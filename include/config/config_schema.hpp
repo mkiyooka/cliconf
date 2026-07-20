@@ -88,6 +88,10 @@ struct AppExtraLoader {
             }
         }
     }
+
+    // CSV ファイルパスが conf に含まれている場合、スキーマ解決後に呼ばれる。
+    // Config に csv_file フィールドを追加し、ここで読み込み処理を実装する。
+    void LoadCsv(Config & /*conf*/) const {}
 };
 
 } // namespace config
