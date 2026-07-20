@@ -5,6 +5,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples)
 add_executable(example_csv_wrapper
     example_csv_wrapper.cpp
 )
+target_include_directories(example_csv_wrapper PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
 target_link_libraries(example_csv_wrapper PRIVATE
     csv
     tl::expected
@@ -13,6 +16,9 @@ target_link_libraries(example_csv_wrapper PRIVATE
 # JSON wrapper example
 add_executable(example_json_wrapper
     example_json_wrapper.cpp
+)
+target_include_directories(example_json_wrapper PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
 )
 target_link_libraries(example_json_wrapper PRIVATE
     yyjson

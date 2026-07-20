@@ -98,8 +98,6 @@ endif()
 # compile_commands.json 生成（エディタは build/compile_commands.json を直接参照する）
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include_directories(include)
-
 # カバレッジフラグ（add_subdirectory より前に設定する必要がある）
 include(cmake/coverage-flags.cmake)
 
