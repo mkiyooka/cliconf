@@ -37,8 +37,9 @@
 #   済ませておけばよい。
 
 # ------------------------------------------------------------------------------
-# cliconf::cliconf（ヘッダオンリー INTERFACE ライブラリ）が常に必要とする依存
-# サブプロジェクトとして取り込まれた場合（PROJECT_IS_TOP_LEVEL=OFF）でも必要。
+# cliconf::cliconf / cliconf::config（どちらもヘッダオンリー INTERFACE ライブラリ）
+# が常に必要とする依存。サブプロジェクトとして取り込まれた場合
+# （PROJECT_IS_TOP_LEVEL=OFF）でも必要。
 # ------------------------------------------------------------------------------
 
 add_external_package(yyjson third_party/yyjson-0.12.0
@@ -94,26 +95,64 @@ if(NOT csv_parser_ALREADY_PROVIDED)
     FetchContent_MakeAvailable(csv_parser)
 endif()
 
+# CLI11 - Command line parser
+# config/config_manager.hpp（cliconf::config）が CLI::App を扱うため常に必要。
+add_external_package(CLI11 third_party/CLI11-2.6.2
+    TARGET_CHECK CLI11::CLI11
+    URL https://github.com/CLIUtils/CLI11/archive/refs/tags/v2.6.2.tar.gz
+    URL_HASH SHA256=c6ea6b2e5608b3ea8617999bd5f47420c71b2ebdb8dc4767c1034d1da5785711
+)
+if(NOT CLI11_ALREADY_PROVIDED)
+    FetchContent_MakeAvailable(CLI11)
+endif()
+
+# tomlplusplus - TOML configuration library
+# config/config_file_loader.hpp（cliconf::config）が toml::table を扱うため常に必要。
+add_external_package(tomlplusplus third_party/tomlplusplus-3.4.0
+    TARGET_CHECK tomlplusplus::tomlplusplus
+    URL https://github.com/marzer/tomlplusplus/archive/refs/tags/v3.4.0.tar.gz
+    URL_HASH SHA256=8517f65938a4faae9ccf8ebb36631a38c1cadfb5efa85d9a72e15b9e97d25155
+)
+if(NOT tomlplusplus_ALREADY_PROVIDED)
+    FetchContent_MakeAvailable(tomlplusplus)
+endif()
+
+# nlohmann/json - JSON/JSONC parser
+# config/config_file_loader.hpp（cliconf::config）が nlohmann::json を扱うため常に必要。
+add_external_package(nlohmann_json third_party/nlohmann_json-3.12.0
+    TARGET_CHECK nlohmann_json::nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+)
+if(NOT nlohmann_json_ALREADY_PROVIDED)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+# fkYAML - YAML parser (header-only)
+# config/config_file_loader.hpp（cliconf::config）が fkyaml::node を扱うため常に必要。
+add_external_package(fkYAML third_party/fkYAML-0.4.3
+    TARGET_CHECK fkYAML_target
+    URL https://github.com/fktn-k/fkYAML/releases/download/v0.4.3/fkYAML.tgz
+    URL_HASH SHA256=2ef4c356fe3ef555694932eb6bf3de6b9893f14f425d743ff0e6a33d2465896d
+)
+if(NOT fkYAML_ALREADY_PROVIDED)
+    FetchContent_MakeAvailable(fkYAML)
+
+    # Create interface library for fkYAML (header-only)
+    add_library(fkYAML_target INTERFACE)
+    target_include_directories(fkYAML_target INTERFACE ${fkyaml_SOURCE_DIR}/include)
+endif()
+
 # ------------------------------------------------------------------------------
-# サンプルアプリ（cliconf::config / src/command / cmd）専用の依存
-# src/CMakeLists.txt が PROJECT_IS_TOP_LEVEL のときしか add_subdirectory(config|command)
-# しないため、サブプロジェクトとして取り込まれた場合はここで取得しても未使用になる。
-# fmt / nlohmann_json / CLI11 は取り込み側でも使われがちな汎用ライブラリのため、
-# 未使用のまま取得すると干渉（同名ターゲットの重複・意図しないバージョン採用）の
-# リスクだけが残る。トップレベルビルド時のみ取得する。
+# サンプルアプリ（config_sample_lib / src/command / cmd）専用の依存
+# src/config/CMakeLists.txt が PROJECT_IS_TOP_LEVEL のときしか config_sample_lib を
+# 作らないため、サブプロジェクトとして取り込まれた場合はここで取得しても未使用になる。
+# fmt は取り込み側でも使われがちな汎用ライブラリのため、未使用のまま取得すると
+# 干渉（同名ターゲットの重複・意図しないバージョン採用）のリスクだけが残る。
+# トップレベルビルド時のみ取得する。
 # ------------------------------------------------------------------------------
 
 if(PROJECT_IS_TOP_LEVEL)
-    # CLI11 - Command line parser
-    add_external_package(CLI11 third_party/CLI11-2.6.2
-        TARGET_CHECK CLI11::CLI11
-        URL https://github.com/CLIUtils/CLI11/archive/refs/tags/v2.6.2.tar.gz
-        URL_HASH SHA256=c6ea6b2e5608b3ea8617999bd5f47420c71b2ebdb8dc4767c1034d1da5785711
-    )
-    if(NOT CLI11_ALREADY_PROVIDED)
-        FetchContent_MakeAvailable(CLI11)
-    endif()
-
     # fmt - Formatting library
     add_external_package(fmt third_party/fmt-12.2.0
         TARGET_CHECK fmt::fmt
@@ -122,39 +161,5 @@ if(PROJECT_IS_TOP_LEVEL)
     )
     if(NOT fmt_ALREADY_PROVIDED)
         FetchContent_MakeAvailable(fmt)
-    endif()
-
-    # tomlplusplus - TOML configuration library
-    add_external_package(tomlplusplus third_party/tomlplusplus-3.4.0
-        TARGET_CHECK tomlplusplus::tomlplusplus
-        URL https://github.com/marzer/tomlplusplus/archive/refs/tags/v3.4.0.tar.gz
-        URL_HASH SHA256=8517f65938a4faae9ccf8ebb36631a38c1cadfb5efa85d9a72e15b9e97d25155
-    )
-    if(NOT tomlplusplus_ALREADY_PROVIDED)
-        FetchContent_MakeAvailable(tomlplusplus)
-    endif()
-
-    # nlohmann/json - JSON/JSONC parser
-    add_external_package(nlohmann_json third_party/nlohmann_json-3.12.0
-        TARGET_CHECK nlohmann_json::nlohmann_json
-        URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
-        URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
-    )
-    if(NOT nlohmann_json_ALREADY_PROVIDED)
-        FetchContent_MakeAvailable(nlohmann_json)
-    endif()
-
-    # fkYAML - YAML parser (header-only)
-    add_external_package(fkYAML third_party/fkYAML-0.4.3
-        TARGET_CHECK fkYAML_target
-        URL https://github.com/fktn-k/fkYAML/releases/download/v0.4.3/fkYAML.tgz
-        URL_HASH SHA256=2ef4c356fe3ef555694932eb6bf3de6b9893f14f425d743ff0e6a33d2465896d
-    )
-    if(NOT fkYAML_ALREADY_PROVIDED)
-        FetchContent_MakeAvailable(fkYAML)
-
-        # Create interface library for fkYAML (header-only)
-        add_library(fkYAML_target INTERFACE)
-        target_include_directories(fkYAML_target INTERFACE ${fkyaml_SOURCE_DIR}/include)
     endif()
 endif()

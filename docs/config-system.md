@@ -109,31 +109,28 @@ Error: Multiple default config files found: config/default.toml config/default.j
 ```mermaid
 graph LR
     subgraph include/config/
-        A["config_loader.hpp\nConfig / PluginConfig / SubcommandMapping 構造体"]
-        B["config_schema.hpp\nFieldDescriptor / kConfigSchema"]
-        C["config_file_loader.hpp\nLoadFromFile / LoadFromFiles\nExpandManifest / FindDefaultConfig"]
-        D["config_manager.hpp\nConfigManager"]
-        CV["config_validator.hpp\nValidate"]
+        C["config_file_loader.hpp\nLoadFromFile / LoadFromFiles\nExpandManifest / FindDefaultConfig（ヘッダオンリー）"]
+        D["config_manager.hpp\nConfigManager（ヘッダオンリー）"]
     end
     subgraph src/config/
-        E["config_loader.cpp\n（スタブ）"]
-        F["config_file_loader.cpp\nTOML / JSONC / YAML / .conf 実装"]
-        G["config_manager.cpp\nConfigManager 実装"]
+        A["config_loader.hpp\nConfig / PluginConfig / SubcommandMapping 構造体"]
+        B["config_schema.hpp\nFieldDescriptor / kConfigSchema"]
+        CV["config_validator.hpp\nValidate"]
         GV["config_validator.cpp\nValidate 実装"]
     end
     subgraph src/command/
         H["subcommand.cpp\nkSubcommandMappings 実体定義"]
     end
-    B --> F
-    B --> G
+    B --> C
     A --> B
-    C --> G
     A --> H
+    CV --> A
+    GV --> CV
 ```
 
 #### 各ファイルの役割とAPI
 
-##### `include/config/config_loader.hpp`
+##### `src/config/config_loader.hpp`
 
 **役割:** 設定値を保持するデータ構造の定義。他のヘッダが依存する基盤。
 
@@ -157,7 +154,7 @@ graph LR
 
 ---
 
-##### `include/config/config_schema.hpp`
+##### `src/config/config_schema.hpp`
 
 **役割:** スキーマ定義の一元管理。CLIオプション名・設定ファイルキー・`Config` メンバーポインタを紐づける。新オプション追加時にここだけ変更すれば CLI 登録・ファイル読み込みの両方が自動で対応される。
 
@@ -214,7 +211,7 @@ graph LR
 
 ---
 
-##### `include/config/config_validator.hpp` / `src/config/config_validator.cpp`
+##### `src/config/config_validator.hpp` / `src/config/config_validator.cpp`
 
 **役割:** マージ後の `Config` を検証する。
 
@@ -238,7 +235,7 @@ graph LR
 `Config` 構造体の1フィールドと、CLIオプション名・設定ファイルキーを紐づける記述子。
 
 ```cpp
-// include/config/config_schema.hpp
+// src/config/config_schema.hpp
 
 template <typename Owner, typename T>
 struct FieldDescriptor {
@@ -264,7 +261,7 @@ FieldDescriptor(std::string_view, std::string_view, std::string_view, T Owner::*
 後述の `std::apply` によりコンパイル時に展開される。
 
 ```cpp
-// include/config/config_schema.hpp
+// src/config/config_schema.hpp
 
 inline constexpr auto kConfigSchema = std::make_tuple(
     FieldDescriptor{"--title",          "title",          "Application title", &Config::title},

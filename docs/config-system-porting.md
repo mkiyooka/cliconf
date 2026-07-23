@@ -62,23 +62,21 @@ target_include_directories(fkYAML_target INTERFACE ${fkyaml_SOURCE_DIR}/include)
 ```text
 include/config/
     config_manager.hpp
+    config_file_loader.hpp
 
 src/config/
-    config_file_loader.hpp
-    config_file_loader.cpp
-    config_manager.cpp
-    config_loader.cpp
+    config_validator.hpp
     config_validator.cpp
 ```
 
-`config_file_loader.cpp` は TOML / JSONC / YAML の全形式に対応しており、改変不要。
+`config_file_loader.hpp` は TOML / JSONC / YAML の全形式に対応しており、改変不要。
 `config_validator.cpp` のバリデーションルールはアプリ固有だが、
 関数シグネチャ（`Validate(const Config&) -> std::string`）はそのまま使える。
 
 ### コピーして改変するファイル
 
 ```text
-include/config/
+src/config/
     config_loader.hpp   （Config 構造体）
     config_schema.hpp   （kConfigSchema のエントリ）
 
@@ -103,31 +101,28 @@ src/command/
 ```text
 移植先プロジェクト/
     include/config/
+        config_manager.hpp     ← そのまま（ヘッダオンリー）
+        config_file_loader.hpp ← そのまま（ヘッダオンリー）
+    src/config/
         config_loader.hpp      ← コピー後に改変
-        config_manager.hpp     ← そのまま
         config_schema.hpp      ← コピー後に改変
         config_validator.hpp   ← そのまま
-    src/config/
-        config_file_loader.hpp ← そのまま
-        config_file_loader.cpp ← そのまま
-        config_manager.cpp     ← そのまま
-        config_loader.cpp      ← そのまま
         config_validator.cpp   ← バリデーションルールを改変
     src/command/
         subcommand.cpp         ← コピー後に改変
         cli.cpp                ← 新規作成
 ```
 
+`config_manager.hpp` / `config_file_loader.hpp` はテンプレートのみで実装されたヘッダオンリーコード
+（`.cpp` は存在しない）。`cliconf::config` を FetchContent で取り込む場合はコピー不要（README-library.md 参照）。
+
 ### ステップ2: CMakeLists.txt に config_lib を追加する
 
 ```cmake
 add_library(config_lib STATIC
-    src/config/config_loader.cpp
-    src/config/config_file_loader.cpp
-    src/config/config_manager.cpp
     src/config/config_validator.cpp
 )
-target_include_directories(config_lib PUBLIC include)
+target_include_directories(config_lib PUBLIC include src)
 target_link_libraries(config_lib PUBLIC
     CLI11::CLI11
     tomlplusplus::tomlplusplus
@@ -142,11 +137,11 @@ target_link_libraries(config_lib PUBLIC
 アプリのフィールドに合わせて `Config` 構造体を書き換える。
 以下の点に注意する。
 
-- `SubcommandMapping` と `kSubcommandMappings` の宣言はサブコマンドが不要な場合も **残す**（`config_file_loader.cpp` から参照されるため）
+- `SubcommandMapping` と `kSubcommandMappings` の宣言はサブコマンドが不要な場合も **残す**（`config_file_loader.hpp` から参照されるため）
 - サブコマンドが不要な場合は `SubcommandConfig` を削除し、後述の `kSubcommandMappings` を空にする
 
 ```cpp
-// include/config/config_loader.hpp
+// src/config/config_loader.hpp
 
 struct Config {
     // アプリ固有のフィールドとデフォルト値を定義する
@@ -170,7 +165,7 @@ extern const std::size_t kSubcommandMappingCount;
 `Config` のフィールドに対応するエントリを `kConfigSchema` に記述する。
 
 ```cpp
-// include/config/config_schema.hpp
+// src/config/config_schema.hpp
 
 inline constexpr auto kConfigSchema = std::make_tuple(
     FieldDescriptor{"--mode",     "mode",     "Operation mode",     &Config::mode},
@@ -349,7 +344,7 @@ server:
 ## plugins のような配列フィールドを追加する場合
 
 `std::vector<T>` のような複合型はスキーマ管理の対象外で、
-設定ファイル専用フィールドとして `config_file_loader.cpp` 内で個別に読み込む。
+設定ファイル専用フィールドとして `config_file_loader.hpp` 内で個別に読み込む。
 
 **1. `Config` に配列フィールドを追加する**
 
@@ -367,7 +362,7 @@ struct Config {
 
 **2. 各ローダーに読み込み処理を追加する**
 
-`config_file_loader.cpp` の `LoadFromToml` / `LoadFromJson` / `LoadFromYaml` それぞれに
+`config_file_loader.hpp` の `LoadFromToml` / `LoadFromJson` / `LoadFromYaml` それぞれに
 配列を読み込むコードを追加する。以下は TOML の例。
 
 ```cpp

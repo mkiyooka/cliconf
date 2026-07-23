@@ -82,11 +82,13 @@ FetchContent_MakeAvailable(cliconf)
 先に確定してしまい、後から行う自分の `FetchContent_Declare` は無視されるので注意してください
 （`FetchContent` は同名コンテンツを一度取得すると、以後の再宣言を無視する仕様のため）。
 
-なお `CLI11` / `fmt` / `toml++` / `nlohmann/json` / `fkYAML` はサンプルアプリ
-（`cliconf::config` 用）専用の依存で、`FetchContent_MakeAvailable(cliconf)` のように
-サブプロジェクトとして取り込んだ場合は取得自体行われません。`cliconf::cliconf`
-（ヘッダオンリー utility/compat）のみが必要な場合は yyjson / csv-parser / tl::expected /
-tcb::span のみを意識すれば十分です。
+なお `fmt` のみは cliconf 自身のサンプルアプリ（`cmd` 実行ファイル）専用の依存で、
+`FetchContent_MakeAvailable(cliconf)` のようにサブプロジェクトとして取り込んだ場合は
+取得自体行われません。`cliconf::cliconf`（ヘッダオンリー utility/compat）のみが必要な場合は
+yyjson / csv-parser / tl::expected / tcb::span のみを、`cliconf::config`
+（ConfigManager / LoadFromFile\*）が必要な場合はそれに加えて CLI11 / toml++ /
+nlohmann/json / fkYAML を意識すれば十分です。どちらのターゲットもヘッダオンリーで、
+サブプロジェクトとして取り込んだ場合でも `PROJECT_IS_TOP_LEVEL` に関係なく利用できます。
 
 ### 2. ターゲットにリンクする
 

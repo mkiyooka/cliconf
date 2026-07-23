@@ -7,7 +7,7 @@ add_executable(test_config_manager
 )
 target_include_directories(test_config_manager PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/src/config
+    ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/tests
 )
 target_link_libraries(test_config_manager PRIVATE command_lib CLI11::CLI11 doctest::doctest sanitizer_flags)
