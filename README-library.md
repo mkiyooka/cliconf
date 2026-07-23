@@ -36,17 +36,57 @@ FetchContent_Declare(cliconf
 FetchContent_MakeAvailable(cliconf)
 ```
 
-`FetchContent_MakeAvailable` を呼ぶと、このプロジェクトが依存する以下のライブラリも自動的に取得されます。
+`FetchContent_MakeAvailable` を呼ぶと、このプロジェクトが依存する以下のライブラリも自動的に取得されます
+（`cliconf::cliconf` のみ使う場合は yyjson / csv-parser 等の一部のみが対象です。詳細は次項）。
 
-| ライブラリ | 用途 |
-| --- | --- |
-| CLI11 | CLI オプション解析 |
-| fmt | フォーマット出力 |
-| toml++ | TOML 読み込み |
-| nlohmann/json | JSONC 読み込み |
-| fkYAML | YAML 読み込み |
-| yyjson | JSON 構築 |
-| csv-parser | CSV 読み込み |
+| ライブラリ | 用途 | 導入済みか判定するターゲット名 |
+| --- | --- | --- |
+| CLI11 | CLI オプション解析 | `CLI11::CLI11` |
+| fmt | フォーマット出力 | `fmt::fmt` |
+| toml++ | TOML 読み込み | `tomlplusplus::tomlplusplus` |
+| nlohmann/json | JSONC 読み込み | `nlohmann_json::nlohmann_json` |
+| fkYAML | YAML 読み込み | `fkYAML_target`（cliconf 内部の合成ターゲット） |
+| yyjson | JSON 構築 | `yyjson` |
+| csv-parser | CSV 読み込み | `csv` |
+| tl::expected | エラーハンドリング | `tl::expected` |
+| tcb::span | `std::span` バックポート | `tcb_span_target`（cliconf 内部の合成ターゲット） |
+
+### 依存ライブラリの競合を避ける（排他制御）
+
+取り込み側プロジェクトが上記と同じライブラリを別バージョンで既に `FetchContent` や
+`find_package` 済みの場合、cliconf は **自前での取得をスキップし、既存のターゲットを
+そのまま使います**。判定は「上表のターゲット名が `FetchContent_MakeAvailable(cliconf)`
+の時点で既に存在するかどうか」で行われるため、cliconf を取り込む**前**に自分のバージョンを
+確定させておくだけで、意図したバージョンが優先されます。
+
+```cmake
+include(FetchContent)
+
+# 先に自分のバージョンの fmt を確定させておく
+FetchContent_Declare(fmt
+    URL https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz
+    URL_HASH SHA256=...
+)
+FetchContent_MakeAvailable(fmt)   # ここで fmt::fmt が生成される
+
+# この時点で fmt::fmt が既に存在するため、
+# cliconf 側の fmt 取得はスキップされる
+FetchContent_Declare(cliconf
+    GIT_REPOSITORY https://github.com/mkiyooka/cliconf.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(cliconf)
+```
+
+逆に順序を守らず `cliconf` を先に取り込むと、cliconf が指定したバージョンが
+先に確定してしまい、後から行う自分の `FetchContent_Declare` は無視されるので注意してください
+（`FetchContent` は同名コンテンツを一度取得すると、以後の再宣言を無視する仕様のため）。
+
+なお `CLI11` / `fmt` / `toml++` / `nlohmann/json` / `fkYAML` はサンプルアプリ
+（`cliconf::config` 用）専用の依存で、`FetchContent_MakeAvailable(cliconf)` のように
+サブプロジェクトとして取り込んだ場合は取得自体行われません。`cliconf::cliconf`
+（ヘッダオンリー utility/compat）のみが必要な場合は yyjson / csv-parser / tl::expected /
+tcb::span のみを意識すれば十分です。
 
 ### 2. ターゲットにリンクする
 
