@@ -219,11 +219,23 @@ pixi run -e dev typos
 
 ```cmake
 add_external_package(mylib third_party/mylib-1.0.0
+    TARGET_CHECK mylib::mylib
     URL https://github.com/example/mylib/archive/refs/tags/v1.0.0.tar.gz
     URL_HASH SHA256=...
 )
-FetchContent_MakeAvailable(mylib)
+if(NOT mylib_ALREADY_PROVIDED)
+    FetchContent_MakeAvailable(mylib)
+endif()
 ```
+
+`TARGET_CHECK` には、そのライブラリが最終的に提供するターゲット名を指定する。
+cliconf は他プロジェクトから `FetchContent` で取り込まれることを想定しているため、
+取り込み側が同じライブラリを別バージョンで先に導入している場合に二重取得・
+ターゲット重複エラーが起きないよう、指定したターゲットが既に存在するときは
+取得自体をスキップする（詳細は `cmake/local-or-fetch.cmake` のコメントおよび
+[README-library.md](../README-library.md) の「依存ライブラリの競合を避ける」を参照）。
+アプリ専用（サブプロジェクトとして取り込まれた際に未使用となる）ライブラリは
+`dependencies-app.cmake` 内で `if(PROJECT_IS_TOP_LEVEL)` により追加でガードする。
 
 ライセンスファイルは以下のコマンドで収集できる。
 

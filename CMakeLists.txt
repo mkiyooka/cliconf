@@ -112,7 +112,15 @@ endif()
 include(FetchContent)
 include(cmake/local-or-fetch.cmake)
 include(cmake/dependencies-app.cmake)
-include(cmake/dependencies-test.cmake)
+
+# doctest / nanobench は tests/ と benches/ でのみ使用され、それらは
+# PROJECT_IS_TOP_LEVEL のときしか add_subdirectory されない（下記参照）。
+# サブプロジェクトとして取り込まれた場合に未使用のまま取得すると、
+# 取り込み側が別バージョンの doctest 等を導入している場合に干渉するだけなので
+# ここで先に絞り込む。
+if(PROJECT_IS_TOP_LEVEL)
+    include(cmake/dependencies-test.cmake)
+endif()
 
 # サニタイザフラグ（FetchContent より後に定義することでサードパーティに伝播しない）
 include(cmake/sanitizer-flags.cmake)

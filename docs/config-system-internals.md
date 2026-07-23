@@ -10,8 +10,8 @@
 
 | ファイル | 役割 |
 | --- | --- |
-| `include/config/config_loader.hpp` | `Config` / `PluginConfig` / `SubcommandConfig` / `SubcommandMapping` の型定義 |
-| `include/config/config_schema.hpp` | `FieldDescriptor` テンプレートと `kConfigSchema` の定義 |
+| `src/config/config_loader.hpp` | `Config` / `PluginConfig` / `SubcommandConfig` / `SubcommandMapping` の型定義 |
+| `src/config/config_schema.hpp` | `FieldDescriptor` テンプレートと `kConfigSchema` の定義 |
 | `include/config/config_manager.hpp` | `ConfigManager` クラス宣言 |
 | `src/config/config_manager.cpp` | `RegisterOptions` / `Resolve` の実装 |
 | `src/config/config_file_loader.cpp` | TOML / JSON / YAML 読み込みの実装 |
@@ -25,7 +25,7 @@
 設定システムの中心は `config_schema.hpp` にある **スキーマ定義** だ。
 
 ```cpp
-// include/config/config_schema.hpp
+// src/config/config_schema.hpp
 
 template <typename Owner, typename T>
 struct FieldDescriptor {

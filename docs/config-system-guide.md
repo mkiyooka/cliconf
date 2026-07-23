@@ -8,7 +8,7 @@
 
 ### 1. Config 構造体にフィールドを追加する
 
-`include/config/config_loader.hpp` にフィールドとデフォルト値を定義する。
+`src/config/config_loader.hpp` にフィールドとデフォルト値を定義する。
 
 ```cpp
 struct Config {
@@ -20,7 +20,7 @@ struct Config {
 
 ### 2. スキーマに1行追加する
 
-`include/config/config_schema.hpp` の `kConfigSchema` に対応エントリを追加する。
+`src/config/config_schema.hpp` の `kConfigSchema` に対応エントリを追加する。
 
 ```cpp
 inline constexpr auto kConfigSchema = std::make_tuple(
